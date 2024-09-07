@@ -1,44 +1,57 @@
-@file:JvmName("Option_Kt")
-
 package com.github.xpwu.stream
 
 import java.net.Socket
+import kotlin.time.Duration
 
-class OptionKt (internal val o : OptionJava)
+class Option {
+	internal var o: OptionJava? = null
 
-fun Host(host: String): OptionKt {
-	return OptionKt(OptionJava.Host(host))
+	internal fun set(o: OptionJava): Option {
+		this.o = o
+		return this
+	}
 }
 
-fun Port(port: Int): OptionKt {
-	return OptionKt(OptionJava.Port(port))
+fun Host(host: String): Option {
+	return Option().set(OptionJava.Host(host))
 }
 
-fun TLS(): OptionKt {
-	return OptionKt(OptionJava.TLS())
+fun Port(port: Int): Option {
+	return Option().set(OptionJava.Port(port))
 }
 
-fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Socket): OptionKt {
-	return OptionKt(OptionJava.TLS(strategy))
+fun TLS(): Option {
+	return Option().set(OptionJava.TLS())
 }
 
-fun ConnectTimeout(duration: Duration): OptionKt {
-	return OptionKt(OptionJava.ConnectTimeout(
+fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Socket): Option {
+	return Option().set(OptionJava.TLS(strategy))
+}
+
+fun ConnectTimeout(duration: Duration): Option {
+	return Option().set(OptionJava.ConnectTimeout(
 		DurationJava(
-			duration.d
+			duration.inWholeMilliseconds * DurationJava.Millisecond
 		)
 	))
 }
 
-fun RequestTimeout(duration: Duration): OptionKt {
-	return OptionKt(OptionJava.RequestTimeout(
+fun RequestTimeout(duration: Duration): Option {
+	return Option().set(OptionJava.RequestTimeout(
 		DurationJava(
-			duration.d
+			duration.inWholeMilliseconds * DurationJava.Millisecond
 		)
 	))
 }
 
-internal fun Array<out OptionKt>.toOptions(): Array<OptionJava> {
-	val l = this.map { return@map it.o }
-	return l.toTypedArray()
+internal fun Array<out Option>.toOptions(): Array<OptionJava> {
+	val list = ArrayList<OptionJava>(this.size)
+	for (opt in this) {
+		opt.o?. let {
+			list.add(it)
+		}
+	}
+
+	val ret = Array<OptionJava>(0){ return@Array OptionJava.Host("")}
+	return list.toArray(ret)
 }

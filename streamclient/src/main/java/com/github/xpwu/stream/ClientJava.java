@@ -7,7 +7,7 @@ import java.util.Map;
 
 class ClientJava {
 
-  public ClientJava(OptionJava... optionJavas) {
+  ClientJava(OptionJava... optionJavas) {
     OptionJava.Value value = new OptionJava.Value();
     for (OptionJava op : optionJavas) {
       op.configValue(value);
@@ -34,7 +34,7 @@ class ClientJava {
     impl.setNet(new LenContent());
   }
 
-  public void updateOptions(OptionJava... optionJavas) {
+  void updateOptions(OptionJava... optionJavas) {
     for (OptionJava op : optionJavas) {
       op.configValue(this.impl.config);
     }
@@ -42,10 +42,10 @@ class ClientJava {
   }
 
 
-  public interface PushCallback {
+  interface PushCallback {
     void onPush(byte[] data);
   }
-  public void setPushCallback(PushCallback delegate) {
+  void setPushCallback(PushCallback delegate) {
     this.impl.pushCallback = new PushCallback() {
       @Override
       public void onPush(byte[] data) {
@@ -61,10 +61,10 @@ class ClientJava {
   }
 
 
-  public interface PeerClosedCallback {
+  interface PeerClosedCallback {
     void onPeerClosed();
   }
-  public void setPeerClosedCallback(PeerClosedCallback delegate) {
+  void setPeerClosedCallback(PeerClosedCallback delegate) {
     this.impl.peerClosedCallback = new PeerClosedCallback() {
       @Override
       public void onPeerClosed() {
@@ -80,14 +80,14 @@ class ClientJava {
   }
 
 
-  public interface ErrorHandler {
+  interface ErrorHandler {
     void onFailed(Error error, boolean isConnError);
   }
-  public interface ResponseHandler extends ErrorHandler{
+  interface ResponseHandler extends ErrorHandler{
     void onSuccess(byte[] response);
   }
   // 自动连接并发送数据
-  public void Send(byte[] data, Map<String, String> headers, ResponseHandler handler) {
+  void Send(byte[] data, Map<String, String> headers, ResponseHandler handler) {
     connect(new ConnectHandler() {
       @Override
       public void onSuccess() {

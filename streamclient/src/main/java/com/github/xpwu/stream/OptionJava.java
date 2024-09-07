@@ -11,15 +11,15 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-public class OptionJava {
-  static public class Value {
-    public String host;
-    public int port;
-    public TLSStrategy tlsStrategy;
-    public DurationJava connectTimeout;
-    public DurationJava heartbeatTime;
-    public DurationJava frameTimeout; // 同一帧里面的数据延时
-    public DurationJava requestTimeout; //请求到响应的超时
+class OptionJava {
+  static class Value {
+    String host;
+    int port;
+    TLSStrategy tlsStrategy;
+    DurationJava connectTimeout;
+    DurationJava heartbeatTime;
+    DurationJava frameTimeout; // 同一帧里面的数据延时
+    DurationJava requestTimeout; //请求到响应的超时
 
     public Value() {
       this.host = "127.0.0.1";
@@ -37,7 +37,7 @@ public class OptionJava {
     }
   }
 
-  static public OptionJava Host(String host) {
+  static OptionJava Host(String host) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -46,7 +46,7 @@ public class OptionJava {
     });
   }
 
-  static public OptionJava Port(int port) {
+  static OptionJava Port(int port) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -55,7 +55,7 @@ public class OptionJava {
     });
   }
 
-  static public OptionJava TLS() {
+  static OptionJava TLS() {
     return TLS(new TLSStrategy() {
       @Override
       public Socket TLS(String host, int port, Socket tcpSocket) throws SSLHandshakeException {
@@ -89,7 +89,7 @@ public class OptionJava {
     });
   }
 
-  static public OptionJava TLS(TLSStrategy strategy) {
+  static OptionJava TLS(TLSStrategy strategy) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -98,7 +98,7 @@ public class OptionJava {
     });
   }
 
-  static public OptionJava ConnectTimeout(DurationJava durationJava) {
+  static OptionJava ConnectTimeout(DurationJava durationJava) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -107,7 +107,7 @@ public class OptionJava {
     });
   }
 
-  static public OptionJava RequestTimeout(DurationJava durationJava) {
+  static OptionJava RequestTimeout(DurationJava durationJava) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -118,7 +118,7 @@ public class OptionJava {
 
   // 由握手协议，在服务器中读取
   @Deprecated
-  static public OptionJava HeartbeatTime(DurationJava durationJava) {
+  static OptionJava HeartbeatTime(DurationJava durationJava) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {
@@ -129,7 +129,7 @@ public class OptionJava {
 
   // 由握手协议，在服务器中读取
   @Deprecated
-  static public OptionJava FrameTimeout(DurationJava durationJava) {
+  static OptionJava FrameTimeout(DurationJava durationJava) {
     return new OptionJava(new Setter() {
       @Override
       public void configValue(Value value) {

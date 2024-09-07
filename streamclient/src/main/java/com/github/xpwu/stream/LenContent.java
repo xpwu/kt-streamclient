@@ -1,5 +1,8 @@
 package com.github.xpwu.stream;
 
+import static com.github.xpwu.x.NetHostKt.Host2Net;
+import static com.github.xpwu.x.NetHostKt.Net2Host;
+
 import android.os.Handler;
 import android.util.Log;
 
@@ -568,9 +571,9 @@ class LenContent implements Net {
       ret.HearBeatTime = new DurationJava((((0xff & handshake[0]) << 8) + (0xff & handshake[1])) * DurationJava.Second);
       ret.FrameTimeout = new DurationJava(handshake[2] * DurationJava.Second);
       ret.MaxConcurrent = handshake[3];
-      ret.MaxBytes = Binary.Net2Host(handshake, 4, 8);
-      long id1 = Binary.Net2Host(handshake, 8, 12);
-      long id2 = Binary.Net2Host(handshake, 12, 16);
+      ret.MaxBytes = Net2Host(handshake, 4, 8);
+      long id1 = Net2Host(handshake, 8, 12);
+      long id2 = Net2Host(handshake, 12, 16);
       ret.ConnectId = String.format("%08x", id1) + String.format("%08x", id2);
       return ret;
     }
@@ -587,7 +590,7 @@ class LenContent implements Net {
     public void sendForce(byte[] content) {
       byte[] len = new byte[4];
       int length = content.length + 4;
-      Binary.Host2Net(length, len);
+      Host2Net(length, len, 0, len.length);
 
       synchronized (sendData) {
         sendData.add(len);
@@ -611,7 +614,7 @@ class LenContent implements Net {
       // todo : test calling sendForce()
       byte[] len = new byte[4];
       int length = content.length + 4;
-      Binary.Host2Net(length, len);
+      Host2Net(length, len, 0, len.length);
 
       synchronized (sendData) {
         sendData.add(len);

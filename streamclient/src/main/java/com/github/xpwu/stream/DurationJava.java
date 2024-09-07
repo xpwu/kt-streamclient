@@ -1,6 +1,6 @@
 package com.github.xpwu.stream;
 
-public class DurationJava {
+class DurationJava {
   static public final long Microsecond = 1;
   static public final long Millisecond = 1000 * Microsecond;
   static public final long Second = 1000 * Millisecond;
@@ -8,19 +8,19 @@ public class DurationJava {
   static public final long Hour = 60 * Minute;
 
   // 10 second: 10*Duration.Second
-  public DurationJava(long d) {
+  DurationJava(long d) {
     this.d = d;
   }
 
-  public long second() {
+  long second() {
     return d/Second;
   }
 
-  public long milliSecond() {
+  long milliSecond() {
     return d/Millisecond;
   }
 
-  public long minute() {
+  long minute() {
     return d/Minute;
   }
 

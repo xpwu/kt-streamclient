@@ -1,17 +1,14 @@
 
 package com.github.xpwu.stream
 
+import com.github.xpwu.x.CurrentThreadDispatcher
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-class Client(vararg options: OptionKt) {
-	internal var clientJava: ClientJava
+class Client(vararg options: Option) {
+	internal val clientJava: ClientJava = ClientJava(*options.toOptions())
 	internal val dispatcher = CurrentThreadDispatcher()
-
-	init {
-		clientJava = ClientJava(*options.toOptions())
-	}
 }
 
 class StError(internal val err: Error, internal val isConnError: Boolean)
@@ -42,7 +39,7 @@ suspend fun Client.Send(data: ByteArray, headers: Map<String, String>): Pair<Res
 	}
 }
 
-fun Client.UpdateOptions(vararg options: OptionKt) {
+fun Client.UpdateOptions(vararg options: Option) {
 	clientJava.updateOptions(*options.toOptions())
 }
 
