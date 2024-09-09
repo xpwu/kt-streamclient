@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 
-class ClientImpl {
+class ClientImplJava {
 
   private void asyncErr(ClientJava.ErrorHandler handler, Error error, boolean isConn) {
     new Handler().post(new Runnable() {
@@ -52,7 +52,7 @@ class ClientImpl {
     waitingConnects.clear();
   }
 
-  private void doAllRequest(FakeHttp.Response response) {
+  private void doAllRequest(FakeHttpJava.Response response) {
     for (Map.Entry<Long, ResponseHandler> entry : allRequests.entrySet()) {
       entry.getValue().onResponse(response);
     }
@@ -111,7 +111,7 @@ class ClientImpl {
     // 底层实现不一定每次connect都回调 onConnected，
     // 所以上层通过ConnectState的判断作了逻辑加强，无论底层是否调用都需要
     // 确保逻辑正确
-    this.net.connect(config.host, config.port, config.tlsStrategy);
+    this.netJava.connect(config.host, config.port, config.tlsStrategy);
     isAsync.value = true;
   }
 
@@ -123,7 +123,7 @@ class ClientImpl {
 
     runWaiting(new Error("connection closed by self"));
     connState = ConnectState.Closing;
-    net.close();
+    netJava.close();
   }
 
   // 如果没有连接成功，直接返回失败
@@ -156,10 +156,10 @@ class ClientImpl {
 
     allRequests.put(reqId, new ResponseHandler() {
       @Override
-      public void onResponse(FakeHttp.Response response) {
+      public void onResponse(FakeHttpJava.Response response) {
         new Handler().removeCallbacks(timeoutR);
 
-        if (response.status != FakeHttp.Response.Status.Ok) {
+        if (response.status != FakeHttpJava.Response.Status.Ok) {
           if (!isAsync.value) {
             asyncErr(handler, new Error(new String(response.data)), false);
             return;
@@ -177,9 +177,9 @@ class ClientImpl {
     });
 
     try {
-      FakeHttp.Request request = new FakeHttp.Request(data, headers);
+      FakeHttpJava.Request request = new FakeHttpJava.Request(data, headers);
       request.setReqId(reqId);
-      request.sendTo(net);
+      request.sendTo(netJava);
       isAsync.value = true;
     } catch (Exception e) {
       allRequests.remove(reqId);
@@ -189,13 +189,13 @@ class ClientImpl {
   }
 
   public void updateNetConnectTime() {
-    this.net.setConfig(new Net.Config(config.connectTimeout, config.heartbeatTime, config.frameTimeout));
+    this.netJava.setConfig(new NetJava.Config(config.connectTimeout, config.heartbeatTime, config.frameTimeout));
   }
 
-  public void setNet(Net net) {
-    this.net = net;
-    this.net.setConfig(new Net.Config(config.connectTimeout, config.heartbeatTime, config.frameTimeout));
-    this.net.setDelegate(new Net.Delegate() {
+  public void setNet(NetJava netJava) {
+    this.netJava = netJava;
+    this.netJava.setConfig(new NetJava.Config(config.connectTimeout, config.heartbeatTime, config.frameTimeout));
+    this.netJava.setDelegate(new NetJava.Delegate() {
       @Override
       public void onConnected() {
         if (connState != ConnectState.Connecting) {
@@ -207,25 +207,25 @@ class ClientImpl {
 
       @Override
       public void onMessage(byte[] message) {
-        FakeHttp.Response response = null;
+        FakeHttpJava.Response response = null;
         try {
-          response = new FakeHttp.Response(message);
+          response = new FakeHttpJava.Response(message);
         } catch (Exception e) {
           String str = e.getMessage();
           if (str == null) {
             str = "fakeHttp response error";
           }
-          response = FakeHttp.Response.fromError(reqId, str);
+          response = FakeHttpJava.Response.fromError(reqId, str);
         }
 
         if (response.isPush()) {
           // push ack 强制写给网络，不计入并发控制
-          net.sendForce(response.newPushAck());
+          netJava.sendForce(response.newPushAck());
           pushCallback.onPush(response.data);
           return;
         }
 
-        net.receivedOneResponse();
+        netJava.receivedOneResponse();
 
         // 这里直接调用allRequests.remove(response.reqID)代替get函数更合适，确保已删除
         ResponseHandler r = allRequests.remove(response.reqID);
@@ -245,7 +245,7 @@ class ClientImpl {
         Log.i("stream.ClientImpl", "onClosed: " + reason);
 
         // 上一次连接后，所有的请求都需要回应
-        doAllRequest(FakeHttp.Response.fromError(0, reason));
+        doAllRequest(FakeHttpJava.Response.fromError(0, reason));
 
         // 正在连接中，不再做关闭的状态处理 (可能是调用了close(), 马上就调用了 connect() 的情况)
         if (connState == ConnectState.Connecting) {
@@ -280,7 +280,7 @@ class ClientImpl {
         if (connState == ConnectState.Connecting || connState == ConnectState.Connected) {
           connState = ConnectState.Closing;
         }
-        net.close();
+        netJava.close();
       }
     });
   }
@@ -289,7 +289,7 @@ class ClientImpl {
   public ClientJava.PushCallback pushCallback;
   public ClientJava.PeerClosedCallback peerClosedCallback;
 
-  private Net net;
+  private NetJava netJava;
   private final List<ClientJava.ConnectHandler> waitingConnects = new ArrayList<>();
 
   enum ConnectState {
@@ -301,7 +301,7 @@ class ClientImpl {
   private long reqId = reqIdStart;
 
   private interface ResponseHandler {
-    void onResponse(FakeHttp.Response response);
+    void onResponse(FakeHttpJava.Response response);
   }
   private final Map<Long, ResponseHandler> allRequests = new HashMap<>();
 }

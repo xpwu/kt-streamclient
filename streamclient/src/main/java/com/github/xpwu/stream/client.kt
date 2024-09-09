@@ -2,36 +2,28 @@
 package com.github.xpwu.stream
 
 import com.github.xpwu.x.CurrentThreadDispatcher
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
-class Client(vararg options: Option) {
+class ClientOld(vararg options: Option) {
 	internal val clientJava: ClientJava = ClientJava(*options.toOptions())
 	internal val dispatcher = CurrentThreadDispatcher()
 }
 
-class StError(internal val err: Error, internal val isConnError: Boolean)
-
-val StError.RawError
-	get() = err
-
-val StError.IsConnError
-	get() = isConnError
-
-
-typealias Response = ByteArray
-
-suspend fun Client.Send(data: ByteArray, headers: Map<String, String>): Pair<Response, StError?> {
+suspend fun ClientOld.Send(data: ByteArray, headers: Map<String, String>): Pair<ByteArray, StError?> {
 	return withContext(dispatcher) {
 		suspendCoroutine {
 			clientJava.Send(data, headers, object : ClientJava.ResponseHandler {
 				override fun onFailed(error: java.lang.Error, isConnError: Boolean) {
-					it.resume(Pair<Response, StError?>(ByteArray(0), StError(error, isConnError)))
+					it.resume(Pair<ByteArray, StError?>(ByteArray(0), StError(error, isConnError)))
 				}
 
 				override fun onSuccess(response: ByteArray) {
-					it.resume(Pair<Response, StError?>(response, null))
+					it.resume(Pair<ByteArray, StError?>(response, null))
 				}
 
 			})
@@ -39,19 +31,19 @@ suspend fun Client.Send(data: ByteArray, headers: Map<String, String>): Pair<Res
 	}
 }
 
-fun Client.UpdateOptions(vararg options: Option) {
+fun ClientOld.UpdateOptions(vararg options: Option) {
 	clientJava.updateOptions(*options.toOptions())
 }
 
-fun Client.OnPush(block: (ByteArray) -> Unit) {
+fun ClientOld.OnPush(block: Pusher) {
 	clientJava.setPushCallback { data -> block(data) }
 }
 
-fun Client.OnPeerClosed(block: () -> Unit) {
+fun ClientOld.OnPeerClosed(block: () -> Unit) {
 	clientJava.setPeerClosedCallback { block() }
 }
 
-suspend fun Client.Recover(): StError? {
+suspend fun ClientOld.Recover(): StError? {
 	return withContext(dispatcher) {
 		suspendCoroutine {
 			clientJava.Recover(object : ClientJava.RecoverHandler {
@@ -68,3 +60,34 @@ suspend fun Client.Recover(): StError? {
 	}
 
 }
+
+
+class Client(private val protocolCreator: ()->Protocol) {
+
+	var onPush: suspend (ByteArray)->Unit = {}
+	var onPeerClosed: suspend ()->Unit = {}
+
+	private var net = Net(protocolCreator, {onPeerClosed()}, {onPush(it)})
+
+	@Synchronized
+	internal fun net(): Net {
+		if (this.net.isInValid) {
+			this.net.close()
+			this.net = Net(protocolCreator, {onPeerClosed()}, {onPush(it)})
+		}
+		return this.net
+	}
+}
+
+suspend fun Client.Send(data: ByteArray, headers: Map<String, String>
+												, timeout: Duration = 30.seconds): Pair<ByteArray, StError?> {
+	val net = net()
+	val err = net.connect()
+	if (err != null) {
+		return Pair(ByteArray(0), StError(err, true))
+	}
+
+	return net.send(data, headers, timeout)
+}
+
+

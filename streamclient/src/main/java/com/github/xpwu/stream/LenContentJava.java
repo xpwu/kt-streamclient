@@ -52,7 +52,7 @@ import java.util.TimerTask;
  */
 
 
-class LenContent implements Net {
+class LenContentJava implements NetJava {
 
   static private class Connection {
 
@@ -635,7 +635,7 @@ class LenContent implements Net {
 
   }
 
-  public LenContent() {
+  public LenContentJava() {
     config = new Config(new DurationJava(30 * DurationJava.Second)
       , new DurationJava(4 * DurationJava.Minute)
       , new DurationJava(15 * DurationJava.Second));

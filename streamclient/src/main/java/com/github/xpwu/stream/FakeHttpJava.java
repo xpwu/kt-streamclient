@@ -27,7 +27,7 @@ import java.util.Map;
  *
  */
 
-class FakeHttp {
+class FakeHttpJava {
   static class Request {
     Request(byte[] body, Map<String, String> headers) throws Exception {
       int length = 4 + 1;
@@ -89,9 +89,9 @@ class FakeHttp {
       data[3] = (byte) (reqId & 0xff);
     }
 
-    public void sendTo(Net net) throws Exception {
-      net.send(data);
-    }
+//    public void sendTo(Net net) throws Exception {
+//      net.send(data);
+//    }
 
     private final byte[] data;
   }

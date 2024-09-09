@@ -1,6 +1,6 @@
 package com.github.xpwu.stream;
 
-interface Net {
+interface NetJava {
 
   interface Delegate {
     void onConnected();

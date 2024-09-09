@@ -13,7 +13,7 @@ class ClientJava {
       op.configValue(value);
     }
 
-    this.impl = new ClientImpl();
+    this.impl = new ClientImplJava();
 
     this.impl.config = value;
 
@@ -31,7 +31,7 @@ class ClientJava {
       }
     };
 
-    impl.setNet(new LenContent());
+    impl.setNet(new LenContentJava());
   }
 
   void updateOptions(OptionJava... optionJavas) {
@@ -114,8 +114,8 @@ class ClientJava {
 
   // 暂不暴露以下接口，需要进一步验证其稳定性
 
-  private void setNet(Net net) {
-    this.impl.setNet(net);
+  private void setNet(NetJava netJava) {
+    this.impl.setNet(netJava);
   }
 
   interface ConnectHandler extends ErrorHandler{
@@ -139,5 +139,5 @@ class ClientJava {
   }
 
 
-  private final ClientImpl impl;
+  private final ClientImplJava impl;
 }

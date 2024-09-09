@@ -1,57 +1,73 @@
 package com.github.xpwu.stream
 
 import java.net.Socket
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocket
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
-class Option {
-	internal var o: OptionJava? = null
-
-	internal fun set(o: OptionJava): Option {
-		this.o = o
-		return this
-	}
+internal class OptionValue {
+	var host: String = "127.0.0.1"
+	var port: Int = 10000
+	var tlsStrategy: (host: String, port: Int, tcpSocket: Socket)->Pair<Socket, Error?>
+		=  {_: String, _: Int, tcpSocket: Socket -> Pair(tcpSocket, null)}
+	var connectTimeout: Duration = 30.seconds
 }
 
+//typealias Option = (OptionValue)->Unit
+
+class Option internal constructor(internal val runner: (OptionValue)->Unit)
+
 fun Host(host: String): Option {
-	return Option().set(OptionJava.Host(host))
+	return Option{
+		value -> value.host = host
+	}
 }
 
 fun Port(port: Int): Option {
-	return Option().set(OptionJava.Port(port))
+	return Option{
+			value -> value.port = port
+	}
 }
 
 fun TLS(): Option {
-	return Option().set(OptionJava.TLS())
+	return Option{
+		value -> value.tlsStrategy =
+		socket@ { host, port, tcpSocket ->
+			val sslSocket: SSLSocket
+			try {
+				val context = SSLContext.getInstance("TLS")
+				context.init(null, null, null)
+				val factory = context.socketFactory
+				sslSocket = factory.createSocket(tcpSocket, host, port, true) as SSLSocket
+				sslSocket.startHandshake()
+			} catch (e: Exception) {
+				return@socket Pair(tcpSocket, Error(e.message))
+			}
+
+			val sslSession = sslSocket.session
+
+			// 使用默认的HostnameVerifier来验证主机名
+			val hv = HttpsURLConnection.getDefaultHostnameVerifier()
+			if (!hv.verify(host, sslSession)) {
+				return@socket Pair(tcpSocket, Error("Expected " + host + ", got " + sslSession.peerPrincipal))
+			}
+
+			return@socket Pair(sslSocket, null)
+		}
+	}
 }
 
-fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Socket): Option {
-	return Option().set(OptionJava.TLS(strategy))
+fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Pair<Socket, Error?>): Option {
+	return Option{
+			value -> value.tlsStrategy = strategy
+	}
 }
 
 fun ConnectTimeout(duration: Duration): Option {
-	return Option().set(OptionJava.ConnectTimeout(
-		DurationJava(
-			duration.inWholeMilliseconds * DurationJava.Millisecond
-		)
-	))
-}
-
-fun RequestTimeout(duration: Duration): Option {
-	return Option().set(OptionJava.RequestTimeout(
-		DurationJava(
-			duration.inWholeMilliseconds * DurationJava.Millisecond
-		)
-	))
-}
-
-internal fun Array<out Option>.toOptions(): Array<OptionJava> {
-	val list = ArrayList<OptionJava>(this.size)
-	for (opt in this) {
-		opt.o?. let {
-			list.add(it)
-		}
+	return Option{
+			value -> value.connectTimeout = duration
 	}
-
-	val ret = Array<OptionJava>(0){ return@Array OptionJava.Host("")}
-	return list.toArray(ret)
 }
+
