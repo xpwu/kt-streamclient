@@ -1,5 +1,6 @@
 package com.github.xpwu.stream
 
+import com.github.xpwu.x.Logger
 import kotlin.time.Duration
 
 interface Protocol {
@@ -25,6 +26,16 @@ interface Protocol {
 
 	fun send(content: ByteArray)
 
-	fun setDelegate(delegate: Delegate)
-	fun setLogger(logger: Logger)
+	var delegate: Delegate
+	var logger: Logger
+}
+
+internal fun Protocol.Handshake.Info(): String {
+	return """
+		ConnectId: ${this.ConnectId}
+		MaxConcurrent: ${this.MaxConcurrent}
+		HearBeatTime: ${this.HearBeatTime}
+		MaxBytes/frame: ${this.MaxBytes}
+		FrameTimeout: ${this.FrameTimeout}
+	""".replaceIndent("	---")
 }

@@ -14,7 +14,7 @@ val StError.IsConnError
 //
 //typealias Pusher = (ByteArray) -> Unit
 
-typealias PeerClosed = () -> Unit
+//typealias PeerClosed = () -> Unit
 
 
 

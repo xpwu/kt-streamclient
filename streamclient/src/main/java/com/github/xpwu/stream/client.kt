@@ -2,6 +2,8 @@
 package com.github.xpwu.stream
 
 
+import com.github.xpwu.x.AndroidLogger
+import com.github.xpwu.x.Logger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -60,11 +62,10 @@ import kotlin.time.Duration.Companion.seconds
 */
 
 
-class Client(internal var protocolCreator: ()->Protocol) {
+class Client(internal var protocolCreator: ()->Protocol, private val logger: Logger = AndroidLogger()) {
 
 	var onPush: suspend (ByteArray)->Unit = {}
 	var onPeerClosed: suspend ()->Unit = {}
-	var logger: Logger = SysLogger()
 
 	internal var net = Net(protocolCreator, {onPeerClosed()}, {onPush(it)})
 	init {

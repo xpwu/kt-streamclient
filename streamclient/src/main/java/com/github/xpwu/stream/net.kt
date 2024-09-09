@@ -1,6 +1,8 @@
 package com.github.xpwu.stream
 
 import com.github.xpwu.stream.fakehttp.parse
+import com.github.xpwu.x.AndroidLogger
+import com.github.xpwu.x.Logger
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.sync.Mutex
@@ -23,14 +25,14 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	internal val isInValid
 		get() = state == State.Invalidated
 
-	internal var logger: Logger = SysLogger()
+	internal var logger: Logger = AndroidLogger()
 
 	private var handshake: Protocol.Handshake = Protocol.Handshake()
 
 	private val protocol: Protocol = protocolCreator()
 	init {
-		protocol.setDelegate(this)
-		protocol.setLogger(logger)
+		protocol.delegate = this
+		protocol.logger = logger
 	}
 
 	private enum class State {
@@ -79,15 +81,18 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 			val ch = Channel<Error?>(1)
 			waitingConnects.add(ch)
 			connLocker.writeLock().unlock()
+			logger.Debug("Net.connect --- state==Connecting", "wait for connecting")
 			return ch.receive()
 		}
 
 		this.state = State.Connecting
 		connLocker.writeLock().unlock()
 
+		logger.Debug("Net.connect --- state!=Connecting", "will connect")
 		val connRet = this.protocol.connect()
 		this.handshake = connRet.first
 		this.reqSemaphore = Semaphore(this.handshake.MaxConcurrent)
+		logger.Info("Net.connect --- handshake" , this.handshake.Info())
 
 		connLocker.writeLock().lock()
 		this.state = if (connRet.second == null) State.Connected else State.Invalidated
@@ -112,6 +117,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 
 		this.state = State.Invalidated
 		this.lastErr = Error("closed by self")
+		logger.Info("Net.close", "closed, become invalidated")
 
 		connLocker.writeLock().unlock()
 
@@ -225,6 +231,8 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	}
 
 	override suspend fun onError(error: Error) {
+		logger.Error("Net.onError", error.toString())
+
 		connLocker.writeLock().lock()
 
 		if (this.state == State.Invalidated) {
