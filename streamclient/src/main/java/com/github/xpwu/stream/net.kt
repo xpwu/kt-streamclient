@@ -23,11 +23,14 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	internal val isInValid
 		get() = state == State.Invalidated
 
+	internal var logger: Logger = SysLogger()
+
 	private var handshake: Protocol.Handshake = Protocol.Handshake()
 
 	private val protocol: Protocol = protocolCreator()
 	init {
 		protocol.setDelegate(this)
+		protocol.setLogger(logger)
 	}
 
 	private enum class State {

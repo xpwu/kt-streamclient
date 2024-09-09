@@ -26,4 +26,5 @@ interface Protocol {
 	fun send(content: ByteArray)
 
 	fun setDelegate(delegate: Delegate)
+	fun setLogger(logger: Logger)
 }

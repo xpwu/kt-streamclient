@@ -1,5 +1,5 @@
 package com.github.xpwu.stream
 
-class LenContent : Net {
+class LenContent : net {
 
 }

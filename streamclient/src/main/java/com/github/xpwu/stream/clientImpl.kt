@@ -15,7 +15,7 @@ import com.github.xpwu.stream.fakehttp.Request as FakeHttpRequest
 
 private const val reqIdStart: Long = 10
 
-internal class ClientImpl(private val net:Net): Net.Delegate {
+internal class ClientImpl(private val net:net): net.Delegate {
 	init {
 		this.net.setDelegate(this)
 	}
@@ -35,7 +35,7 @@ internal class ClientImpl(private val net:Net): Net.Delegate {
 	private var reqSemaphore: Semaphore = Semaphore(5)
 	private val allRequests: MutableMap<Long, SendChannel<FakeHttpResponse>> = HashMap()
 
-	private var handshake: Net.Handshake = Net.Handshake()
+	private var handshake: net.Handshake = net.Handshake()
 
 	//////------
 
