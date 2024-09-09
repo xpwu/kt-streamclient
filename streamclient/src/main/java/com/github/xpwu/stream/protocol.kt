@@ -15,19 +15,24 @@ interface Protocol {
 	interface Delegate {
 		suspend fun onMessage(message: ByteArray)
 
-		// 连接成功后，任何不能继续通信的情况都以 onError 返回
-		// connect() 的错误不触发 onError
-		// close() 的调用不触发 onError
+		/**
+		 * 连接成功后，任何不能继续通信的情况都以 onError 返回
+		 * connect() 的错误不能触发 onError
+		 * close() 的调用不能触发 onError
+		 */
 		suspend fun onError(error: Error)
 	}
 
+	/**
+	 * connect() 与 close() 上层使用方确保只会调用一次
+	 */
 	suspend fun connect(): Pair<Handshake, Error?>
 	fun close()
 
-	fun send(content: ByteArray)
+	suspend fun send(content: ByteArray)
 
-	var delegate: Delegate
-	var logger: Logger
+	fun setDelegate(delegate: Delegate)
+	fun setLogger(logger: Logger)
 }
 
 internal fun Protocol.Handshake.Info(): String {

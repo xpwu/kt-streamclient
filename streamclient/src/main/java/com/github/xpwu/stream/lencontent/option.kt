@@ -1,4 +1,4 @@
-package com.github.xpwu.stream
+package com.github.xpwu.stream.lencontent
 
 import java.net.Socket
 import javax.net.ssl.HttpsURLConnection
@@ -10,7 +10,8 @@ import kotlin.time.Duration.Companion.seconds
 internal class OptionValue {
 	var host: String = "127.0.0.1"
 	var port: Int = 10000
-	var tlsStrategy: (host: String, port: Int, tcpSocket: Socket)->Pair<Socket, Error?>
+	var tls: (host: String, port: Int, tcpSocket: Socket)->Pair<Socket, Error?>
+		// default: no tls
 		=  {_: String, _: Int, tcpSocket: Socket -> Pair(tcpSocket, null)}
 	var connectTimeout: Duration = 30.seconds
 }
@@ -33,7 +34,7 @@ fun Port(port: Int): Option {
 
 fun TLS(): Option {
 	return Option{
-		value -> value.tlsStrategy =
+		value -> value.tls =
 		socket@ { host, port, tcpSocket ->
 			val sslSocket: SSLSocket
 			try {
@@ -61,7 +62,7 @@ fun TLS(): Option {
 
 fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Pair<Socket, Error?>): Option {
 	return Option{
-			value -> value.tlsStrategy = strategy
+			value -> value.tls = strategy
 	}
 }
 

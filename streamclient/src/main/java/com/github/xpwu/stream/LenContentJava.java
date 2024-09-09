@@ -20,35 +20,36 @@ import java.util.TimerTask;
 
 
 /**
- lencontent protocol:
-
- 1, handshake protocol:
-
-                        client ------------------ server
-                        |                          |
-                        |                          |
-                        ABCDEF (A^...^F = 0xff) --->  check(A^...^F == 0xff) --- N--> over
-                        (A is version)
-                        |                          |
-                        |                          |Y
-                        |                          |
- version 1:   set client heartbeat  <----- HeartBeat_s (2 bytes, net order)
- version 2:       set config     <-----  HeartBeat_s | FrameTimeout_s | MaxConcurrent | MaxBytes | connect id
-                                          HeartBeat_s: 2 bytes, net order
-                                          FrameTimeout_s: 1 byte
-                                          MaxConcurrent: 1 byte
-                                          MaxBytes: 4 bytes, net order
-                                          connect id: 8 bytes, net order
-                        |                          |
-                        |                          |
-                        |                          |
-                        data      <-------->       data
-
-
- 2, data protocol:
-    1) length | content
-    length: 4 bytes, net order; length=sizeof(content)+4; length=0 => heartbeat
-
+ *
+ * lencontent protocol:
+ *
+ * 1, handshake protocol:
+ *
+ *                        client ------------------ server
+ *                        |                          |
+ *                        |                          |
+ *                        ABCDEF (A^...^F = 0xff) --->  check(A^...^F == 0xff) --- N--> over
+ *                        (A is version)
+ *                        |                          |
+ *                        |                          |Y
+ *                        |                          |
+ * version 1:   set client heartbeat  <----- HeartBeat_s (2 bytes, net order)
+ * version 2:       set config     <-----  HeartBeat_s | FrameTimeout_s | MaxConcurrent | MaxBytes | connect id
+ *                                          HeartBeat_s: 2 bytes, net order
+ *                                          FrameTimeout_s: 1 byte
+ *                                          MaxConcurrent: 1 byte
+ *                                          MaxBytes: 4 bytes, net order
+ *                                          connect id: 8 bytes, net order
+ *                        |                          |
+ *                        |                          |
+ *                        |                          |
+ *                        data      <-------->       data
+ *
+ *
+ * 2, data protocol:
+ *    1) length | content
+ *    length: 4 bytes, net order; length=sizeof(content)+4; length=0 => heartbeat
+ *
  */
 
 

@@ -31,8 +31,8 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 
 	private val protocol: Protocol = protocolCreator()
 	init {
-		protocol.delegate = this
-		protocol.logger = logger
+		protocol.setDelegate(this)
+		protocol.setLogger(logger)
 	}
 
 	private enum class State {
