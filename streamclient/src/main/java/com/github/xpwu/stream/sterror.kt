@@ -7,15 +7,3 @@ val StError.RawError
 
 val StError.IsConnError
 	get() = isConnError
-
-
-
-//typealias ByteArray = ByteArray
-//
-//typealias Pusher = (ByteArray) -> Unit
-
-//typealias PeerClosed = () -> Unit
-
-
-
-

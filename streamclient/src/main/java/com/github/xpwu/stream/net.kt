@@ -3,10 +3,13 @@ package com.github.xpwu.stream
 import com.github.xpwu.stream.fakehttp.parse
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -19,7 +22,7 @@ private const val reqIdStart: Long = 10
 
 // onPeerClosed: Net.close() 的调用不会触发 onPeerClosed
 internal class Net internal constructor(protocolCreator: ()->Protocol
-																				, private val onPeerClosed: suspend ()->Unit
+																				, private val onPeerClosed: suspend (Error)->Unit
 																				, private val onPush: suspend (ByteArray)->Unit): Protocol.Delegate {
 
 	internal val isInValid
@@ -167,12 +170,19 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		// 如果此时再把 ch 直接放入 allRequests 中，就不会收到 channel 信号了，
 		//    只能等待后续的超时，这样造成没必要的时间等待
 		if (state == State.Invalidated) {
+			reqMutex.unlock()
 			return Pair(ByteArray(0), StError(lastErr?:UnknownError(), true))
 		}
 		allRequests[reqId] = ch
 		reqMutex.unlock()
 
-		this.protocol.send(request.encodedData)
+		this.protocol.send(request.encodedData)?.let {
+			reqMutex.lock()
+			allRequests.remove(reqId)
+			reqMutex.unlock()
+
+			return Pair(ByteArray(0), StError(it, false))
+		}
 
 		var ret = withTimeoutOrNull(timeout) {
 			return@withTimeoutOrNull ch.receive()
@@ -217,8 +227,13 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 				return
 			}
 
-			this.protocol.send(pushAck.first)
-			this.onPush(response.data)
+			withContext(Dispatchers.Default) {
+				launch {
+					// ignore error
+					this@Net.protocol.send(pushAck.first)
+					this@Net.onPush(response.data)
+				}
+			}
 			return
 		}
 
@@ -227,7 +242,6 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		val ch = allRequests.remove(response.reqID)
 		reqMutex.unlock()
 		ch?.send(Pair(response, null))
-
 	}
 
 	override suspend fun onError(error: Error) {
@@ -243,7 +257,11 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		this.state = State.Invalidated
 		this.lastErr = error
 
-		onPeerClosed()
+		withContext(Dispatchers.Default) {
+			launch {
+				onPeerClosed(error)
+			}
+		}
 
 		// 所有连接
 		for (ch in waitingConnects) {

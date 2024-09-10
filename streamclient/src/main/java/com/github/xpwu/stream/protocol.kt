@@ -6,9 +6,9 @@ import kotlin.time.Duration
 interface Protocol {
 	class Handshake {
 		var HearBeatTime: Duration = Duration.INFINITE
-		var FrameTimeout: Duration = Duration.INFINITE // 同一帧里面的数据延时
+		var FrameTimeout: Duration = Duration.INFINITE // 同一帧里面的数据超时
 		var MaxConcurrent: Int = Int.MAX_VALUE // 一个连接上的最大并发
-		var MaxBytes: Long = 1024 * 1024 // 一次数据发送的最大字节数
+		var MaxBytes: Long = 10* 1024 * 1024 // 一帧数据的最大字节数
 		var ConnectId: String = "---no_connectId---"
 	}
 
@@ -16,9 +16,9 @@ interface Protocol {
 		suspend fun onMessage(message: ByteArray)
 
 		/**
-		 * 连接成功后，任何不能继续通信的情况都以 onError 返回
-		 * connect() 的错误不能触发 onError
-		 * close() 的调用不能触发 onError
+		 * 连接成功后，任何不能继续通信的情况都以 onError 返回，
+		 * close() 的调用也可能触发
+		 * connect() 的错误不会触发 onError
 		 */
 		suspend fun onError(error: Error)
 	}
@@ -29,7 +29,9 @@ interface Protocol {
 	suspend fun connect(): Pair<Handshake, Error?>
 	fun close()
 
-	suspend fun send(content: ByteArray)
+	// 仅是本次 send 的错误，不是底层通信的错误，底层通信的错误通过 onError 返回
+	// 需要 send 尽快把数据给到底层就行，而不需等待数据 send 一定结束，所以这里不用 suspend
+	fun send(content: ByteArray): Error?
 
 	fun setDelegate(delegate: Delegate)
 	fun setLogger(logger: Logger)
