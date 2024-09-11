@@ -2,6 +2,8 @@
 package com.github.xpwu.stream
 
 
+import com.github.xpwu.stream.lencontent.LenContent
+import com.github.xpwu.stream.lencontent.Option
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
 import kotlin.time.Duration
@@ -56,5 +58,15 @@ fun Client.Close() {
 
 suspend fun Client.Recover(): StError? {
 	return net().connect()?.let { StError(it, true) }
+}
+
+// default protocol: LenContent
+
+fun Client(vararg options: Option, logger: Logger = AndroidLogger()): Client {
+	return Client(protocol@{return@protocol LenContent(*options)}, logger)
+}
+
+fun Client.UpdateOptions(vararg options: Option) {
+	this.UpdateProtocol protocol@{ return@protocol LenContent(*options) }
 }
 
