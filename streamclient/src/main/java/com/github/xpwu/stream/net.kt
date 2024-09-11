@@ -38,6 +38,14 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		protocol.setLogger(logger)
 	}
 
+	/**
+	 *
+	 *    NotConnect  --->  Connecting  ---> Connected ---> Invalidated
+	 *                          |                                ^
+	 *                          |                                |
+	 *                          |________________________________|
+	 *
+	 */
 	private enum class State {
 		NotConnect, Connecting, Connected, Invalidated
 	}
@@ -249,6 +257,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 
 		connLocker.writeLock().lock()
 
+		// todo != connected
 		if (this.state == State.Invalidated) {
 			connLocker.writeLock().unlock()
 			return

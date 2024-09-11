@@ -141,7 +141,7 @@ class LenContent(vararg options: Option) : Protocol {
     _close()
   }
 
-  override fun send(content: ByteArray): Error? {
+  override suspend fun send(content: ByteArray): Error? {
     return _send(content)
   }
 
