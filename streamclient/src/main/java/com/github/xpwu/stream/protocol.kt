@@ -6,29 +6,31 @@ import kotlin.time.Duration
 
 /**
  *
- * 上层的调用顺序及响应顺序逻辑：
+ * 上层的调用 Protocol 及响应 Delegate 的时序逻辑：
  *
- *                             +--------------------------------------+
- *                             |                                      |
- *                             |                                      v
- *     connect{1} --+--(true)--+---[.async]-->send{n && con=1} ---> close{1}
- *                  |          |                                      ^
- *           (false)|          |-------> onMessage                    |
- *                  |          |             |                        |
- *        <Unit>----+          |          (error) ---- [.async] ----->|
- *                             |                                      |
- *                             +--------> onError ---- [.async] ------+
+ *                             +-----------------------------------+
+ *                             |                                   |
+ *                             |                                   v
+ *     connect{1} --+--(true)--+---[.async]--->send{n} ------> close{1}
+ *                  |          |                                   ^
+ *           (false)|          |-------> onMessage                 |
+ *                  |          |             |                     |
+ *        <Unit>----+          |          (error) --- [.async] --->|
+ *                             |                                   |
+ *                             +--------> onError --- [.async] ----+
  *
  *
- *    connect() 与 close() 上层使用方确保只会调用 1 次
- *    send() 会异步调用 n 次，但上层确保并发数为 1
- *    connect() 失败，不会请求/响应任何接口
- *    onMessage 失败 及 onError 会异步调用 close()
+ *    Protocol.connect() 与 Protocol.close() 上层使用方确保只会调用 1 次
+ *    Protocol.connect() 失败，不会请求/响应任何接口
+ *    Protocol.send() 会异步并发地调用 n 次，Protocol.send() 执行的时长不会让调用方挂起等待
+ *    在上层明确调用 Protocol.close() 后，才不会调用 Protocol.send()
+ *    Delegate.onMessage() 失败 及 Delegate.onError() 会异步调用 Protocol.close()
  *
- *    连接成功后，任何不能继续通信的情况都以 onError 返回
- *    close() 的调用不触发 onError
- *    connect() 的错误不触发 onError
- *    send() 仅返回本次 send 的错误，不是底层通信的错误，底层通信的错误通过 onError 返回
+ *    连接成功后，任何不能继续通信的情况都以 Delegate.onError() 返回
+ *    Delegate.close() 的调用不触发 Delegate.onError()
+ *    Delegate.connect() 的错误不触发 Delegate.onError()
+ *    Delegate.send() 仅返回本次 Delegate.send() 的错误，
+ *       不是底层通信的错误，底层通信的错误通过 Delegate.onError() 返回
  *
  */
 
@@ -51,7 +53,7 @@ interface Protocol {
 	}
 
 	suspend fun connect(): Pair<Handshake, Error?>
-	fun close()
+	suspend fun close()
 	suspend fun send(content: ByteArray): Error?
 
 	fun setDelegate(delegate: Delegate)

@@ -4,7 +4,6 @@ import com.github.xpwu.stream.Protocol
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
 import com.github.xpwu.x.Net2Host
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
@@ -71,32 +70,32 @@ private fun nullOutputStream(): OutputStream {
  *
  * LenContent protocol:
  *
- * 1, handshake protocol:
+ *     1, handshake protocol:
  *
- *                        client ------------------ server
- *                        |                          |
- *                        |                          |
- *                        ABCDEF (A^...^F = 0xff) --->  check(A^...^F == 0xff) --- N--> over
- *                        (A is version)
- *                        |                          |
- *                        |                          |Y
- *                        |                          |
- * version 1:   set client heartbeat  <----- HeartBeat_s (2 bytes, net order)
- * version 2:       set config     <-----  HeartBeat_s | FrameTimeout_s | MaxConcurrent | MaxBytes | connect id
- *                                          HeartBeat_s: 2 bytes, net order
- *                                          FrameTimeout_s: 1 byte
- *                                          MaxConcurrent: 1 byte
- *                                          MaxBytes: 4 bytes, net order
- *                                          connect id: 8 bytes, net order
- *                        |                          |
- *                        |                          |
- *                        |                          |
- *                        data      <-------->       data
+ *                                 client ------------------ server
+ *                                 |                          |
+ *                                 |                          |
+ *                                 ABCDEF (A^...^F = 0xff) --->  check(A^...^F == 0xff) --- N--> over
+ *                                 (A is version)
+ *                                 |                          |
+ *                                 |                          |Y
+ *                                 |                          |
+ *          version 1:   set client heartbeat  <----- HeartBeat_s (2 bytes, net order)
+ *          version 2:       set config     <-----  HeartBeat_s | FrameTimeout_s | MaxConcurrent | MaxBytes | connect id
+ *                                                   HeartBeat_s: 2 bytes, net order
+ *                                                   FrameTimeout_s: 1 byte
+ *                                                   MaxConcurrent: 1 byte
+ *                                                   MaxBytes: 4 bytes, net order
+ *                                                   connect id: 8 bytes, net order
+ *                                 |                          |
+ *                                 |                          |
+ *                                 |                          |
+ *                                 data      <-------->       data
  *
  *
- * 2, data protocol:
- *    1) length | content
- *    length: 4 bytes, net order; length=sizeof(content)+4; length=0 => heartbeat
+ *     2, data protocol:
+ *        1) length | content
+ *        length: 4 bytes, net order; length=sizeof(content)+4; length=0 => heartbeat
  *
  */
 
@@ -112,19 +111,6 @@ class LenContent(vararg options: Option) : Protocol {
   internal val outputMutex: Mutex = Mutex()
   internal var outputStream = nullOutputStream()
 
-  internal val onErrorAsync: suspend (Error)->Unit = onError@ {
-    withContext(Dispatchers.Default) {
-      launch {
-        if (socket.isClosed) {
-          return@launch
-        }
-
-        this@LenContent.close()
-        this@LenContent.delegate.onError(it)
-      }
-    }
-  }
-
   internal var handshake: Protocol.Handshake = Protocol.Handshake()
 
   init {
@@ -137,7 +123,7 @@ class LenContent(vararg options: Option) : Protocol {
     return _connect()
   }
 
-  override fun close() {
+  override suspend fun close() {
     _close()
   }
 
@@ -209,10 +195,10 @@ private suspend fun LenContent.receiveInputStream() {
     try {
       inputStream = socket.getInputStream()
     } catch (e: SocketException) {
-      this@receiveInputStream.onErrorAsync(Error(e.message?:"get inputstream error, maybe connection closed by peer"))
+      this@receiveInputStream.delegate.onError(Error(e.message?:"get inputstream error, maybe connection closed by peer"))
       return@withContext
     } catch (e: IOException) {
-      this@receiveInputStream.onErrorAsync(Error(e.toString()))
+      this@receiveInputStream.delegate.onError(Error(e.toString()))
       return@withContext
     }
 
@@ -230,7 +216,7 @@ private suspend fun LenContent.receiveInputStream() {
           var n: Int = inputStream.read(lengthB, pos, 1)
           if (n <= 0) {
             if (!socket.isClosed) {
-              this@receiveInputStream.onErrorAsync(Error("inputstream read-1 error, maybe connection closed by peer"))
+              this@receiveInputStream.delegate.onError(Error("inputstream read-1 error, maybe connection closed by peer"))
             }
             break
           }
@@ -244,7 +230,7 @@ private suspend fun LenContent.receiveInputStream() {
           }
           if (n <= 0) {
             if (!socket.isClosed) {
-              this@receiveInputStream.onErrorAsync(Error("inputstream read-4 error, maybe connection closed by peer"))
+              this@receiveInputStream.delegate.onError(Error("inputstream read-4 error, maybe connection closed by peer"))
             }
             break
           }
@@ -262,7 +248,7 @@ private suspend fun LenContent.receiveInputStream() {
           length -= 4
           // todo: server must use this MaxBytes value also
           if (length > this@receiveInputStream.handshake.MaxBytes) {
-            this@receiveInputStream.onErrorAsync(
+            this@receiveInputStream.delegate.onError(
               Error("""received Too Large data(len=$length), must be less than ${this@receiveInputStream.handshake.MaxBytes}"""))
             break
           }
@@ -275,7 +261,7 @@ private suspend fun LenContent.receiveInputStream() {
           }
           if (n <= 0) {
             if (!socket.isClosed) {
-              this@receiveInputStream.onErrorAsync(Error("inputstream read-n error, maybe connection closed by peer"))
+              this@receiveInputStream.delegate.onError(Error("inputstream read-n error, maybe connection closed by peer"))
             }
             break
           }
@@ -283,14 +269,14 @@ private suspend fun LenContent.receiveInputStream() {
           this@receiveInputStream.delegate.onMessage(data)
 
         } catch (e: SocketTimeoutException) {
-          this@receiveInputStream.onErrorAsync(
+          this@receiveInputStream.delegate.onError(
             Error("""LenContent.receiveInputStream---${if(heartbeatTimeout)"Heartbeat" else "Frame"}-timeout: ${e.message?:e.toString()}"""))
           break
         } catch (e: SocketException) {
-          this@receiveInputStream.onErrorAsync(Error(e.message?:"LenContent.receiveInputStream---SocketException"))
+          this@receiveInputStream.delegate.onError(Error(e.message?:"LenContent.receiveInputStream---SocketException"))
           break
         } catch (e: Exception) {
-          this@receiveInputStream.onErrorAsync(Error(e.toString()))
+          this@receiveInputStream.delegate.onError(Error(e.toString()))
           break
         }
       }
@@ -381,7 +367,7 @@ private suspend fun LenContent.setOutputHeartbeat() {
       outputMutex.lock()
       outputStream.write(ByteArray(4){0})
     }catch (e: Exception) {
-      this@setOutputHeartbeat.onErrorAsync(Error(e.message?:e.toString()))
+      this@setOutputHeartbeat.delegate.onError(Error(e.message?:e.toString()))
     }finally {
       outputMutex.unlock()
     }
@@ -392,24 +378,22 @@ private suspend fun LenContent.setOutputHeartbeat() {
   }
 }
 
-internal fun LenContent._send(content: ByteArray): Error? {
+internal suspend fun LenContent._send(content: ByteArray): Error? {
   if (content.size > this.handshake.MaxBytes) {
     return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes})""")
   }
 
-  CoroutineScope(Dispatchers.IO).launch {
-    stopOutputHeartbeat()
-
+  withContext(Dispatchers.IO) {
     try {
+      stopOutputHeartbeat()
       outputMutex.lock()
       outputStream.write(content)
-    }catch (e: Exception) {
-      this@_send.onErrorAsync(Error(e.message?:e.toString()))
-    }finally {
+    } catch (e: Exception) {
+      this@_send.delegate.onError(Error(e.message?:e.toString()))
+    } finally {
       outputMutex.unlock()
+      setOutputHeartbeat()
     }
-
-    setOutputHeartbeat()
   }
 
   return null
