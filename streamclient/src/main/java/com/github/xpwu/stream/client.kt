@@ -60,13 +60,4 @@ suspend fun Client.Recover(): StError? {
 	return net().connect()?.let { StError(it, true) }
 }
 
-// default protocol: LenContent
-
-fun Client(vararg options: Option, logger: Logger = AndroidLogger()): Client {
-	return Client(protocol@{return@protocol LenContent(*options)}, logger)
-}
-
-fun Client.UpdateOptions(vararg options: Option) {
-	this.UpdateProtocol protocol@{ return@protocol LenContent(*options) }
-}
 
