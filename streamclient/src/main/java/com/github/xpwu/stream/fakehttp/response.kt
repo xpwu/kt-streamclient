@@ -1,8 +1,6 @@
 package com.github.xpwu.stream.fakehttp
 
-import android.util.Log
 import com.github.xpwu.stream.fakehttp.Response.Status
-import java.nio.charset.StandardCharsets
 import java.util.Arrays
 
 /**
@@ -106,8 +104,4 @@ internal fun ByteArray.parse(): Pair<Response, Error?> {
 
 	return Pair(res, null)
 }
-
-//internal fun fromError(reqID: Long, error: String): Response {
-//	return Response(reqID, Status.Failed, error.toByteArray(StandardCharsets.UTF_8))
-//}
 
