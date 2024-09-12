@@ -217,7 +217,10 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		}
 
 		val reqId = reqId()
-		val request = FakeHttpRequest(data, headers)
+		val (request, err) = FakeHttpRequest(data, headers)
+		if (err != null) {
+			return Pair(ByteArray(0), StError(err, false))
+		}
 		request.setReqId(reqId)
 		if (request.encodedData.size > handshake.MaxBytes) {
 			return Pair(ByteArray(0)
@@ -261,13 +264,11 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	}
 
 	override suspend fun onMessage(message: ByteArray) {
-		val res = message.parse()
-		res.second?.let {
+		val (response, err) = message.parse()
+		err?.let {
 			onError(it)
 			return
 		}
-
-		val response = res.first
 
 		if (response.isPush) {
 			val pushAck = response.newPushAck()

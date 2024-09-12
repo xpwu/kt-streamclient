@@ -1,7 +1,6 @@
 package com.github.xpwu.stream.fakehttp
 
-import android.util.Log
-import android.util.Pair
+
 import java.nio.charset.StandardCharsets
 
 /**
@@ -37,60 +36,9 @@ import java.nio.charset.StandardCharsets
  */
 
 
-internal class Request(body: ByteArray, headers: Map<String, String>) {
-
-	private val data: ByteArray
+internal class Request(private val data: ByteArray = ByteArray(0)) {
 
 	internal val encodedData: ByteArray get() = data
-
-	init {
-		var length = 4 + 1
-		length += body.size
-
-		val headerList = ArrayList<Pair<ByteArray, ByteArray>>()
-		for ((key1, value1) in headers) {
-			val key = key1.toByteArray(StandardCharsets.UTF_8)
-			val value = value1.toByteArray(StandardCharsets.UTF_8)
-
-			if (key.size > 255 || value.size > 255) {
-				val e = Exception(
-					"key('" + key1 + "')'s length or value('"
-						+ value1 + "') is more than 255 "
-				)
-				Log.e("fakeHttp.request", "header error", e)
-				throw e
-			}
-			length += 1 + key.size + 1 + value.size
-
-			headerList.add(Pair(key, value))
-		}
-
-		val request = ByteArray(length)
-
-
-		var pos = 4
-
-		for (entry in headerList) {
-			val key = entry.first
-			val value = entry.second
-
-			request[pos] = key.size.toByte()
-			pos++
-			System.arraycopy(key, 0, request, pos, key.size)
-			pos += key.size
-			request[pos] = value.size.toByte()
-			pos++
-			System.arraycopy(value, 0, request, pos, value.size)
-			pos += value.size
-		}
-
-		request[pos] = 0 // header-end
-		pos++
-
-		System.arraycopy(body, 0, request, pos, body.size)
-
-		data = request
-	}
 
 	fun setReqId(reqId: Long) {
 		data[0] = ((reqId and 0xff000000L) shr 24).toByte()
@@ -101,4 +49,51 @@ internal class Request(body: ByteArray, headers: Map<String, String>) {
 
 }
 
+internal fun Request(body: ByteArray, headers: Map<String, String>): Pair<Request, Error?> {
+	var length = 4 + 1
+	length += body.size
 
+	val headerList = ArrayList<Pair<ByteArray, ByteArray>>()
+	for ((key1, value1) in headers) {
+		val key = key1.toByteArray(StandardCharsets.UTF_8)
+		val value = value1.toByteArray(StandardCharsets.UTF_8)
+
+		if (key.size > 255 || value.size > 255) {
+			val e = Error(
+				"key('" + key1 + "')'s length or value('"
+					+ value1 + "') is more than 255 "
+			)
+
+			return Pair(Request(), e)
+		}
+		length += 1 + key.size + 1 + value.size
+
+		headerList.add(Pair(key, value))
+	}
+
+	val data = ByteArray(length)
+
+
+	var pos = 4
+
+	for (entry in headerList) {
+		val key = entry.first
+		val value = entry.second
+
+		data[pos] = key.size.toByte()
+		pos++
+		System.arraycopy(key, 0, data, pos, key.size)
+		pos += key.size
+		data[pos] = value.size.toByte()
+		pos++
+		System.arraycopy(value, 0, data, pos, value.size)
+		pos += value.size
+	}
+
+	data[pos] = 0 // header-end
+	pos++
+
+	System.arraycopy(body, 0, data, pos, body.size)
+
+	return Pair(Request(data), null)
+}
