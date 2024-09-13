@@ -17,7 +17,7 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-xpwu-x = { group = "com.github.xpwu", name = "kt-x", version = "0.0.3" }
+xpwu-x = { group = "com.github.xpwu", name = "kt-x", version = "0.0.4" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
