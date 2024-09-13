@@ -1,5 +1,6 @@
 package com.github.xpwu.stream.lencontent
 
+import com.github.xpwu.stream.Info
 import com.github.xpwu.stream.Protocol
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
@@ -20,8 +21,8 @@ import java.net.Socket
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.util.Objects
-import java.util.Random
 import kotlin.concurrent.Volatile
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 private class DummyDelegate(private val logger: Logger): Protocol.Delegate {
@@ -35,7 +36,7 @@ private class DummyDelegate(private val logger: Logger): Protocol.Delegate {
    * close() 的调用不触发 onError
    */
   override suspend fun onError(error: Error) {
-    logger.Error("LenContent.DummyDelegate.onError", error.toString())
+    logger.Debug("LenContent.DummyDelegate.onError", error.toString())
   }
 
 }
@@ -112,6 +113,9 @@ class LenContent(vararg options: Option) : Protocol {
   internal var outputStream = nullOutputStream()
 
   internal var handshake: Protocol.Handshake = Protocol.Handshake()
+  internal val connectID: String get() = handshake.ConnectId
+
+  internal val flag = Random.nextLong()
 
   init {
     for (op in options) {
@@ -137,12 +141,14 @@ class LenContent(vararg options: Option) : Protocol {
 
   override fun setLogger(logger: Logger) {
     this.logger = logger
+    val ph = Integer.toHexString(this.hashCode())
+    logger.Debug("LenContent[$flag].new", "hashcode=$ph")
   }
 }
 
 private fun handshakeReq(): ByteArray {
   val handshake = ByteArray(6)
-  Random().nextBytes(handshake)
+  Random.nextBytes(handshake)
 
   // version is 2
   handshake[0] = 2
@@ -168,6 +174,7 @@ private fun LenContent.readHandshake(inputStream: InputStream): Pair<Protocol.Ha
   while (handshake.size - pos != 0) {
     val n = inputStream.read(handshake, pos, handshake.size - pos)
     if (n <= 0) {
+      logger.Debug("LenContent[$flag].readHandshake:error", "maybe connection closed by peer or timeout")
       return Pair(Protocol.Handshake(), Error("read handshake error, maybe connection closed by peer or timeout"))
     }
 
@@ -185,6 +192,8 @@ private fun LenContent.readHandshake(inputStream: InputStream): Pair<Protocol.Ha
 
   this.handshake = ret
 
+  logger.Debug("LenContent[$flag]<$connectID>.readHandshake:handshake", this.handshake.Info())
+
   return Pair(ret, null)
 }
 
@@ -195,15 +204,17 @@ private suspend fun LenContent.receiveInputStream() {
     try {
       inputStream = socket.getInputStream()
     } catch (e: SocketException) {
+      logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:getInputStream", "error --- ${e.message}")
       this@receiveInputStream.delegate.onError(Error(e.message?:"get inputstream error, maybe connection closed by peer"))
       return@withContext
     } catch (e: IOException) {
+      logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:getInputStream", "error --- ${e.message}")
       this@receiveInputStream.delegate.onError(Error(e.toString()))
       return@withContext
     }
 
     launch {
-
+      logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:start", "run loop...")
       while (!socket.isClosed && socket.isConnected) {
         var heartbeatTimeout = true
         try {
@@ -218,6 +229,7 @@ private suspend fun LenContent.receiveInputStream() {
             if (!socket.isClosed) {
               this@receiveInputStream.delegate.onError(Error("inputstream read-1 error, maybe connection closed by peer"))
             }
+            logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:read-1", "error: n<=0")
             break
           }
           pos += n
@@ -229,6 +241,7 @@ private suspend fun LenContent.receiveInputStream() {
             pos += n
           }
           if (n <= 0) {
+            logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:read-4", "error: n<=0")
             if (!socket.isClosed) {
               this@receiveInputStream.delegate.onError(Error("inputstream read-4 error, maybe connection closed by peer"))
             }
@@ -241,13 +254,15 @@ private suspend fun LenContent.receiveInputStream() {
             + ((0xff and lengthB[2].toInt()) shl 8)
             + ((0xff and lengthB[3].toInt())))
           if (length == 0L) { // heartbeat
-            this@receiveInputStream.logger.Debug("LenContent.receive---Heartbeat", "receive heartbeat from server")
+            logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:Heartbeat", "receive heartbeat from server")
             continue
           }
 
           length -= 4
           // todo: server must use this MaxBytes value also
           if (length > this@receiveInputStream.handshake.MaxBytes) {
+            logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:MaxBytes"
+              , "error: data(len: $length > maxbytes: ${handshake.MaxBytes}) is Too Large")
             this@receiveInputStream.delegate.onError(
               Error("""received Too Large data(len=$length), must be less than ${this@receiveInputStream.handshake.MaxBytes}"""))
             break
@@ -260,26 +275,32 @@ private suspend fun LenContent.receiveInputStream() {
             pos += n
           }
           if (n <= 0) {
+            logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:read-n", "error: n<=0")
             if (!socket.isClosed) {
               this@receiveInputStream.delegate.onError(Error("inputstream read-n error, maybe connection closed by peer"))
             }
             break
           }
 
+          logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:read", "read one message")
           this@receiveInputStream.delegate.onMessage(data)
 
         } catch (e: SocketTimeoutException) {
+          logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:timeout", "error: ${if(heartbeatTimeout)"Heartbeat" else "Frame"}-timeout")
           this@receiveInputStream.delegate.onError(
             Error("""LenContent.receiveInputStream---${if(heartbeatTimeout)"Heartbeat" else "Frame"}-timeout: ${e.message?:e.toString()}"""))
           break
         } catch (e: SocketException) {
+          logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:error", e.message?:"unknown")
           this@receiveInputStream.delegate.onError(Error(e.message?:"LenContent.receiveInputStream---SocketException"))
           break
         } catch (e: Exception) {
+          logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:error", e.message?:"unknown")
           this@receiveInputStream.delegate.onError(Error(e.toString()))
           break
         }
       }
+      logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:end", "run loop is end")
     }
   }
 }
@@ -287,12 +308,15 @@ private suspend fun LenContent.receiveInputStream() {
 internal suspend fun LenContent._connect(): Pair<Protocol.Handshake, Error?> {
   val r = withTimeoutOrNull(optValue.connectTimeout) {
     withContext(Dispatchers.IO) {
+      logger.Debug("LenContent[$flag]._connect:start", "start")
       try {
         socket.connect(InetSocketAddress(optValue.host, optValue.port)
           , optValue.connectTimeout.inWholeMilliseconds.toInt())
 
         val tlsRes = optValue.tls(optValue.host, optValue.port, socket)
         if (tlsRes.second != null) {
+          logger.Debug("LenContent[$flag]._connect:tls"
+            , "error: ${tlsRes.second!!.message?:"unknown"}")
           return@withContext Pair(Protocol.Handshake(), tlsRes.second)
         }
         socket = tlsRes.first
@@ -308,18 +332,26 @@ internal suspend fun LenContent._connect(): Pair<Protocol.Handshake, Error?> {
         return@withContext readHandshake(socket.getInputStream())
 
       } catch (e: Exception) {
+        logger.Debug("LenContent[$flag]._connect:error", e.message?:"unknown")
         return@withContext Pair(Protocol.Handshake(), Error(e.message?:e.toString()))
       }
     }
   }
 
   r?.let {
+    if (it.second != null) {
+      logger.Debug("LenContent[$flag]._connect:error", it.second!!.message?:"unknown")
+      return it
+    }
     receiveInputStream()
     setOutputHeartbeat()
 
+    logger.Debug("LenContent[$flag]<$connectID>._connect:end", "connectID = $connectID")
     return it
   }
 
+  logger.Debug("LenContent[$flag]._connect:timeout"
+    , "timeout(${optValue.connectTimeout.inWholeSeconds}s)")
   return Pair(Protocol.Handshake()
     , Error("""LenContent._connect: timeout(${optValue.connectTimeout.inWholeSeconds}s)"""))
 }
@@ -329,10 +361,11 @@ internal fun LenContent._close() {
     if (socket.isClosed) {
       return
     }
+    logger.Debug("LenContent[$flag]<$connectID>._close", "closed")
     heartbeatStop.close()
     socket.close()
   } catch (e: Exception) {
-   logger.Error("LenContent._close:", e.toString())
+   logger.Error("LenContent[$flag]<$connectID>._close:error", e.toString())
   }
 }
 
@@ -343,6 +376,7 @@ internal fun LenContent._close() {
  */
 private suspend fun LenContent.stopOutputHeartbeat() {
   try {
+    logger.Debug("LenContent[$flag]<$connectID>.outputHeartbeatTimer", "will stop")
     heartbeatStop.send(true)
   } catch (e: ClosedReceiveChannelException) {
     return
@@ -350,6 +384,7 @@ private suspend fun LenContent.stopOutputHeartbeat() {
 }
 
 private suspend fun LenContent.setOutputHeartbeat() {
+  logger.Debug("LenContent[$flag]<$connectID>.outputHeartbeatTimer:set", "set")
   val ret = withTimeoutOrNull(this.handshake.HearBeatTime) {
     try {
       heartbeatStop.receive()
@@ -359,10 +394,14 @@ private suspend fun LenContent.setOutputHeartbeat() {
   }
 
   // stopped
-  ret?.let { return }
+  ret?.let {
+    logger.Debug("LenContent[$flag]<$connectID>.outputHeartbeatTimer:stopped", "stopped")
+    return
+  }
 
   // timeout
   withContext(Dispatchers.IO) {
+    logger.Debug("LenContent[$flag]<$connectID>.outputHeartbeatTimer:send", "send heartbeat to server")
     try {
       outputMutex.lock()
       outputStream.write(ByteArray(4){0})
@@ -385,10 +424,13 @@ internal suspend fun LenContent._send(content: ByteArray): Error? {
 
   withContext(Dispatchers.IO) {
     try {
+      logger.Debug("LenContent[$flag]<$connectID>._send:start", "data size = ${content.size}")
       stopOutputHeartbeat()
       outputMutex.lock()
       outputStream.write(content)
+      logger.Debug("LenContent[$flag]<$connectID>._send:end", "end")
     } catch (e: Exception) {
+      logger.Debug("LenContent[$flag]<$connectID>._send:error", e.message?:"unknown")
       this@_send.delegate.onError(Error(e.message?:e.toString()))
     } finally {
       outputMutex.unlock()

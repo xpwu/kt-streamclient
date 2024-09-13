@@ -6,6 +6,7 @@ import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
 import com.github.xpwu.x.toHex
 import java.util.Random
+import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -21,14 +22,12 @@ private const val reqidKey = "X-Req-Id"
 
 suspend fun Client.SendWithReqId(data: ByteArray, headers: Map<String, String>
 												 , timeout: Duration = 30.seconds): Pair<ByteArray, StError?> {
-	val reqid = ByteArray(8)
-	Random().nextBytes(reqid)
 
 	val muHeaders: MutableMap<String, String> = HashMap()
 	for ((i, v) in headers) {
 		muHeaders[i] = v
 	}
-	muHeaders[reqidKey] = reqid.toHex()
+	muHeaders[reqidKey] = UUID.randomUUID().toString()
 
 	return this.Send(data, muHeaders, timeout)
 }

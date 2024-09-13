@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import com.github.xpwu.stream.fakehttp.Response as FakeHttpResponse
@@ -89,6 +90,15 @@ private sealed class State {
 	data object Connecting: State()
 	data object Connected: State()
 	data class Invalidated(val err: Error): State()
+
+	override fun toString(): String {
+		return when(this) {
+			is Invalidated -> "Invalidated"
+			NotConnect -> "NotConnect"
+			Connecting -> "Connecting"
+			Connected -> "Connected"
+		}
+	}
 }
 
 // onPeerClosed: Net.close() 的调用不会触发 onPeerClosed
@@ -111,22 +121,34 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	private var reqId = reqIdStart
 	private val allRequests: SyncAllRequest = SyncAllRequest()
 
+	private val flag = Random.nextLong()
+
 	init {
 		protocol.setDelegate(this)
 		protocol.setLogger(logger)
+		val ph = Integer.toHexString(protocol.hashCode())
+		logger.Debug("Net[$flag].new", "flag=$flag, protocol.hashcode=$ph")
 	}
 
 	protected fun finalize() {
 		this.close()
 	}
 
+	internal val connectID: String get() = handshake.ConnectId
+
 	// 可重复调用
 	internal suspend fun connect(): Error? {
 		connLocker.readLock().lock()
 		val nowSt = this.state
 		connLocker.readLock().unlock()
-		if (nowSt == State.Connected) return null
-		if (nowSt is State.Invalidated) return nowSt.err
+		if (nowSt == State.Connected) {
+			logger.Debug("Net[$flag].connect:Connected", "connID=${connectID}")
+			return null
+		}
+		if (nowSt is State.Invalidated) {
+			logger.Debug("Net[$flag].connect<$connectID>:Invalidated", nowSt.err.message?:"unknown")
+			return nowSt.err
+		}
 
 		try {
 			connLocker.writeLock().lock()
@@ -138,7 +160,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 					// waiting
 					val ch = Channel<Error?>(1)
 					waitingConnects.add(ch)
-					logger.Debug("Net.connect --- state==Connecting", "wait for connecting")
+					logger.Debug("Net[$flag].connect:Connecting", "wait for being connected")
 					return ch.receive()
 				}
 				State.NotConnect -> this.state = State.Connecting
@@ -148,15 +170,15 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		}
 
 		// State.NotConnect
-		logger.Debug("Net.connect --- state==NotConnect", "will connect")
+		logger.Debug("Net[$flag].connect:NotConnect", "will connect")
 		val connRet = this.protocol.connect()
 		val err = connRet.second
 		if (err == null) {
 			this.handshake = connRet.first
 			this.allRequests.semaphore = Semaphore(this.handshake.MaxConcurrent)
-			logger.Info("Net.connect --- handshake" , this.handshake.Info())
+			logger.Debug("Net[$flag]<$connectID>.connect:handshake" , this.handshake.Info())
 		} else {
-			logger.Error("Net.connect", err.toString())
+			logger.Debug("Net[$flag].connect:error", err.toString())
 		}
 
 		try {
@@ -187,6 +209,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	private suspend fun sendSafely(data: ByteArray): StError? {
 		try {
 			connLocker.readLock().lock()
+			logger.Debug("Net[$flag]<$connectID>.sendSafely:state", state.toString())
 			// 发送前，需要再次判断状态，才能确保 send 的调用符合 protocol 的要求
 			// 另外，也防止 onError 已经执行的情况下，再 send，可能会造成没有 respond 的情况，而被迫等待超时
 			state.let {
@@ -197,6 +220,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 			return this.protocol.send(data)?.let { StError(it, false) }
 
 		} catch(e: Exception) {
+			logger.Debug("Net[$flag]<$connectID>.sendSafely:error", e.message?:e.toString())
 			return StError(Error(e.message?:e.toString()), true)
 		} finally {
 			connLocker.readLock().unlock()
@@ -209,6 +233,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		connLocker.readLock().lock()
 		val nowSt = this.state
 		connLocker.readLock().unlock()
+		logger.Debug("Net[$flag]<$connectID>.send:state", """$state --- $headers""")
 		if (nowSt is State.Invalidated) {
 			return Pair(ByteArray(0), StError(nowSt.err, true))
 		}
@@ -219,10 +244,14 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		val reqId = reqId()
 		val (request, err) = FakeHttpRequest(data, headers)
 		if (err != null) {
+			logger.Debug("Net[$flag]<$connectID>.send:FakeHttpRequest"
+				, """$headers (reqId:${reqId}) --- error: $err""")
 			return Pair(ByteArray(0), StError(err, false))
 		}
 		request.setReqId(reqId)
 		if (request.encodedData.size > handshake.MaxBytes) {
+			logger.Debug("Net[$flag]<$connectID>.send:MaxBytes"
+				, """$headers (reqId:${reqId}) --- error: Too Large""")
 			return Pair(ByteArray(0)
 				, StError(Error("""request.size(${request.encodedData.size}) > MaxBytes(${handshake.MaxBytes})""")
 					, false))
@@ -249,12 +278,17 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 					return@let Pair(ByteArray(0), it.second)
 				}
 
+				logger.Debug("Net[$flag]<$connectID>.send:response"
+					, """$headers (reqId:${reqId}) --- ${it.first.status}""")
+
 				return@let if (it.first.status != FakeHttpResponse.Status.Ok)
 					Pair(ByteArray(0), StError(Error(String(it.first.data)), false))
 				else Pair(it.first.data, null)
 			}
 
 			// ret == null: timeout
+			logger.Debug("Net[$flag]<$connectID>.send:Timeout"
+				, """$headers (reqId:${reqId}) --- timeout(>${timeout.inWholeSeconds}$)""")
 			return ret?:Pair(ByteArray(0)
 				, StError(Error("""request timeout(${timeout.inWholeSeconds}s)"""), false))
 
@@ -266,6 +300,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	override suspend fun onMessage(message: ByteArray) {
 		val (response, err) = message.parse()
 		err?.let {
+			logger.Debug("Net[$flag]<$connectID>.onMessage:parse", """error --- ${it.message}:unknown""")
 			onError(it)
 			return
 		}
@@ -273,6 +308,8 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		if (response.isPush) {
 			val pushAck = response.newPushAck()
 			pushAck.second?.let {
+				logger.Debug("Net[$flag]<$connectID>.onMessage:newPushAck"
+					, """error --- ${it.message}:unknown""")
 				onError(it)
 				return
 			}
@@ -286,13 +323,24 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 			withContext(Dispatchers.IO) {
 				launch {
 					// ignore error
-					sendSafely(pushAck.first)
+					sendSafely(pushAck.first)?.let {
+						logger.Debug("Net[$flag]<$connectID>.onMessage:pushAck"
+							, """error --- ${it.message}:unknown""")
+					}
 				}
 			}
 			return
 		}
 
-		allRequests.Remove(response.reqID)?.send(Pair(response, null))
+		val ch = allRequests.Remove(response.reqID)
+		if (ch == null) {
+			logger.Warning("Net[$flag]<$connectID>.onMessage:NotFind"
+				, """warning: not find request for reqId(${response.reqID})""")
+			return
+		}
+
+		logger.Debug("Net[$flag]<$connectID>.onMessage:response", """reqId=${response.reqID}""")
+		ch.send(Pair(response, null))
 	}
 
 	private suspend fun closeAndOldState(error: Error): State {
@@ -305,6 +353,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 			}
 
 			this.state = State.Invalidated(error)
+			logger.Debug("Net[$flag]<$connectID>.Invalidated", error.message?:"unknown")
 
 			// 所有连接
 			for (ch in waitingConnects) {
@@ -326,7 +375,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	override suspend fun onError(error: Error) {
 		val oldState = closeAndOldState(error)
 		if (oldState == State.Connected) {
-			logger.Error("Net.onError", error.toString())
+			logger.Debug("Net[$flag]<$connectID>.onError", error.toString())
 
 			withContext(Dispatchers.Default) {
 				launch {
@@ -343,7 +392,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		CoroutineScope(Dispatchers.IO).launch {
 			val oldState = closeAndOldState(Error("closed by self"))
 			if (oldState == State.Connected) {
-				logger.Info("Net.close", "closed, become invalidated")
+				logger.Debug("Net[$flag]<$connectID>.close", "closed, become invalidated")
 
 				this@Net.protocol.close()
 			}
