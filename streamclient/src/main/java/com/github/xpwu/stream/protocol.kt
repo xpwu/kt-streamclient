@@ -62,11 +62,7 @@ interface Protocol {
 }
 
 internal fun Protocol.Handshake.Info(): String {
-	return """
-		ConnectId: ${this.ConnectId}
-		MaxConcurrent: ${this.MaxConcurrent}
-		HearBeatTime: ${this.HearBeatTime}
-		MaxBytes/frame: ${this.MaxBytes}
-		FrameTimeout: ${this.FrameTimeout}
-	""".replaceIndent("	---")
+	return "handshake info: {ConnectId: ${this.ConnectId}, MaxConcurrent: ${this.MaxConcurrent}" +
+		", HearBeatTime: ${this.HearBeatTime}, MaxBytes/frame: ${this.MaxBytes}, FrameTimeout: ${this.FrameTimeout} }"
 }
+

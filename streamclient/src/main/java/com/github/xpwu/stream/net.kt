@@ -3,14 +3,15 @@ package com.github.xpwu.stream
 import com.github.xpwu.stream.fakehttp.parse
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.locks.ReadWriteLock
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -24,9 +25,17 @@ private const val reqIdStart: Long = 10
 
 private typealias RequestChannel = Channel<Pair<FakeHttpResponse, StError?>>
 
-private class SyncAllRequest(var semaphore: Semaphore = Semaphore(5)) {
+private class SyncAllRequest(permits: Int = 3) {
 	private val reqMutex: Mutex = Mutex()
 	private val allRequests: MutableMap<Long, RequestChannel> = HashMap()
+
+	private var semaphore: Semaphore = Semaphore(permits)
+
+	var permits = permits
+		set(value) {
+			semaphore = Semaphore(value)
+			field = value
+		}
 
 	suspend fun Add(reqId: Long): RequestChannel {
 		try {
@@ -68,7 +77,7 @@ private class SyncAllRequest(var semaphore: Semaphore = Semaphore(5)) {
 				}
 			}
 			allRequests.clear()
-			while (semaphore.availablePermits != 0) {
+			while (semaphore.availablePermits < permits) {
 				semaphore.release()
 			}
 		} finally {
@@ -101,14 +110,13 @@ private sealed class State {
 	}
 }
 
-internal class Net internal constructor(protocolCreator: ()->Protocol
-																				, private val onPeerClosed: suspend (Error)->Unit
-																				, private val onPush: suspend (ByteArray)->Unit): Protocol.Delegate {
+internal class Net internal constructor(private val logger: Logger = AndroidLogger()
+	, protocolCreator: ()->Protocol
+	, private val onPeerClosed: suspend (Error)->Unit
+	, private val onPush: suspend (ByteArray)->Unit): Protocol.Delegate {
 
 	internal val isInValid
 		get() = state is State.Invalidated
-
-	internal var logger: Logger = AndroidLogger()
 
 	private var handshake: Protocol.Handshake = Protocol.Handshake()
 
@@ -120,7 +128,9 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 	private var reqId = reqIdStart
 	private val allRequests: SyncAllRequest = SyncAllRequest()
 
-	private val flag = Random.nextLong()
+	private val scope = CoroutineScope(CoroutineName("Net"))
+
+	private val flag = Integer.toHexString(Random.nextInt())
 
 	init {
 		protocol.setDelegate(this)
@@ -174,10 +184,10 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		val err = connRet.second
 		if (err == null) {
 			this.handshake = connRet.first
-			this.allRequests.semaphore = Semaphore(this.handshake.MaxConcurrent)
-			logger.Debug("Net[$flag]<$connectID>.connect:handshake" , this.handshake.Info())
+			this.allRequests.permits = this.handshake.MaxConcurrent
+			logger.Debug("Net[$flag]<$connectID>.connect:handshake" , this.handshake.toString())
 		} else {
-			logger.Debug("Net[$flag].connect:error", err.toString())
+			logger.Debug("Net[$flag].connect:error", err.message?:err.toString())
 		}
 
 		try {
@@ -262,16 +272,18 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		try {
 			val ch = allRequests.Add(reqId)
 
-			withContext(Dispatchers.IO) {
-				launch {
+			val ret = withTimeoutOrNull(timeout) {
+				val sendJob = launch(Dispatchers.IO) {
 					sendSafely(request.encodedData)?.let {
 						ch.send(Pair(FakeHttpResponse(), it))
 					}
 				}
-			}
 
-			val ret = withTimeoutOrNull(timeout) {
-				return@withTimeoutOrNull ch.receive()
+				val ret = ch.receive()
+				// 再强制结束 send, 以免阻塞
+				sendJob.cancel()
+
+				return@withTimeoutOrNull ret
 			}?.let {
 				if (it.second != null) {
 					return@let Pair(ByteArray(0), it.second)
@@ -313,19 +325,14 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 				return
 			}
 
-			withContext(Dispatchers.Default) {
-				launch {
-					this@Net.onPush(response.data)
-				}
+			scope.launch(Dispatchers.Default) {
+				this@Net.onPush(response.data)
 			}
-
-			withContext(Dispatchers.IO) {
-				launch {
-					// ignore error
-					sendSafely(pushAck.first)?.let {
-						logger.Debug("Net[$flag]<$connectID>.onMessage:pushAck"
-							, """error --- ${it.message}:unknown""")
-					}
+			scope.launch(Dispatchers.IO) {
+				// ignore error
+				sendSafely(pushAck.first)?.let {
+					logger.Debug("Net[$flag]<$connectID>.onMessage:pushAck"
+						, """error --- ${it.message}:unknown""")
 				}
 			}
 			return
@@ -376,10 +383,8 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 		if (oldState == State.Connected) {
 			logger.Debug("Net[$flag]<$connectID>.onError", error.toString())
 
-			withContext(Dispatchers.Default) {
-				launch {
-					onPeerClosed(error)
-				}
+			scope.launch(Dispatchers.Default) {
+				onPeerClosed(error)
 			}
 
 			this.protocol.close()
@@ -395,6 +400,8 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 
 				this@Net.protocol.close()
 			}
+
+			scope.cancel("closed by self")
 		}
 	}
 

@@ -1,7 +1,7 @@
 package com.github.xpwu.stream
 
 open class StError(internal val err: Error, internal val isConnError: Boolean)
-	: Throwable("""${err.message}, isConnError: $isConnError""", err)
+	: Throwable("""{msg: ${err.message}, isConnError: $isConnError}""", err)
 
 val StError.RawError
 	get() = err

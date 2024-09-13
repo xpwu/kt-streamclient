@@ -4,8 +4,6 @@ import com.github.xpwu.stream.lencontent.LenContent
 import com.github.xpwu.stream.lencontent.Option
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
-import com.github.xpwu.x.toHex
-import java.util.Random
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
