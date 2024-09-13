@@ -1,6 +1,6 @@
 package com.github.xpwu.stream
 
-class StError(internal val err: Error, internal val isConnError: Boolean)
+open class StError(internal val err: Error, internal val isConnError: Boolean)
 	: Throwable("""${err.message}, isConnError: $isConnError""", err)
 
 val StError.RawError
@@ -8,3 +8,8 @@ val StError.RawError
 
 val StError.IsConnError
 	get() = isConnError
+
+class TimeoutStError(err: Error, isConnError: Boolean): StError(err, isConnError)
+
+class TimeoutError(msg: String): Error(msg)
+

@@ -52,6 +52,7 @@ interface Protocol {
 		suspend fun onError(error: Error)
 	}
 
+	// timeout: return TimeoutError
 	suspend fun connect(): Pair<Handshake, Error?>
 	suspend fun close()
 	suspend fun send(content: ByteArray): Error?

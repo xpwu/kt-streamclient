@@ -101,7 +101,6 @@ private sealed class State {
 	}
 }
 
-// onPeerClosed: Net.close() 的调用不会触发 onPeerClosed
 internal class Net internal constructor(protocolCreator: ()->Protocol
 																				, private val onPeerClosed: suspend (Error)->Unit
 																				, private val onPush: suspend (ByteArray)->Unit): Protocol.Delegate {
@@ -290,7 +289,7 @@ internal class Net internal constructor(protocolCreator: ()->Protocol
 			logger.Debug("Net[$flag]<$connectID>.send:Timeout"
 				, """$headers (reqId:${reqId}) --- timeout(>${timeout.inWholeSeconds}$)""")
 			return ret?:Pair(ByteArray(0)
-				, StError(Error("""request timeout(${timeout.inWholeSeconds}s)"""), false))
+				, TimeoutStError(Error("""request timeout(${timeout.inWholeSeconds}s)"""), false))
 
 		} finally {
 			allRequests.Remove(reqId)

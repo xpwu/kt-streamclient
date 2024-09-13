@@ -2,6 +2,7 @@ package com.github.xpwu.stream.lencontent
 
 import com.github.xpwu.stream.Info
 import com.github.xpwu.stream.Protocol
+import com.github.xpwu.stream.TimeoutError
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
 import com.github.xpwu.x.Net2Host
@@ -260,6 +261,7 @@ private suspend fun LenContent.receiveInputStream() {
 
           length -= 4
           // todo: server must use this MaxBytes value also
+          // 出现这种情况，很可能是协议出现问题了，而不能单纯的认为是本次请求的问题
           if (length > this@receiveInputStream.handshake.MaxBytes) {
             logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:MaxBytes"
               , "error: data(len: $length > maxbytes: ${handshake.MaxBytes}) is Too Large")
@@ -310,8 +312,10 @@ internal suspend fun LenContent._connect(): Pair<Protocol.Handshake, Error?> {
     withContext(Dispatchers.IO) {
       logger.Debug("LenContent[$flag]._connect:start", "start")
       try {
+        // connect 没有明确的 timeout 类型返回，所以让 connect 比 withTimeoutOrNull 多一秒
+        // withTimeoutOrNull 先于 connect 超时
         socket.connect(InetSocketAddress(optValue.host, optValue.port)
-          , optValue.connectTimeout.inWholeMilliseconds.toInt())
+          , optValue.connectTimeout.plus(1.seconds).inWholeMilliseconds.toInt())
 
         val tlsRes = optValue.tls(optValue.host, optValue.port, socket)
         if (tlsRes.second != null) {
@@ -350,10 +354,11 @@ internal suspend fun LenContent._connect(): Pair<Protocol.Handshake, Error?> {
     return it
   }
 
+  // timeout
   logger.Debug("LenContent[$flag]._connect:timeout"
     , "timeout(${optValue.connectTimeout.inWholeSeconds}s)")
   return Pair(Protocol.Handshake()
-    , Error("""LenContent._connect: timeout(${optValue.connectTimeout.inWholeSeconds}s)"""))
+    , TimeoutError("""LenContent._connect: timeout(${optValue.connectTimeout.inWholeSeconds}s)"""))
 }
 
 internal fun LenContent._close() {
