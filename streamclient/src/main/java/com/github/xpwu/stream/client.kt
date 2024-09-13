@@ -8,7 +8,7 @@ import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-class Client(internal var protocolCreator: ()->Protocol, internal val logger: Logger = AndroidLogger()) {
+class Client(internal val logger: Logger = AndroidLogger(), internal var protocolCreator: ()->Protocol) {
 
 	var onPush: suspend (ByteArray)->Unit = {}
 	var onPeerClosed: suspend (reason: Error)->Unit = {}

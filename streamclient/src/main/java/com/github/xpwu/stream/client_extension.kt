@@ -11,7 +11,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 fun Client(vararg options: Option, logger: Logger = AndroidLogger()): Client {
-	return Client(protocol@{return@protocol LenContent(*options) }, logger)
+	return Client(logger) {LenContent(*options) }
 }
 
 fun Client.UpdateOptions(vararg options: Option) {
