@@ -1,7 +1,6 @@
 package com.github.xpwu.stream
 
 import com.github.xpwu.stream.lencontent.Host
-import com.github.xpwu.stream.lencontent.Option
 import com.github.xpwu.stream.lencontent.Port
 import com.github.xpwu.x.PrintlnLogger
 import kotlinx.coroutines.async
@@ -9,28 +8,19 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.io.FileInputStream
-import java.util.Properties
 
 class ClientUnitTest {
-	private val properties = Properties()
-	// 在 project root 目录的 local.properties 文件中，设定 test.host 与 test.port
-	private val propertiesFile = FileInputStream("../local.properties")
-	private var host = ""
-	private var port = 80
+	private val properties = LocalProperties()
 
-	init {
-		// 加载文件内容到Properties对象
-		properties.load(propertiesFile)
-		// 关闭文件输入流
-		propertiesFile.close()
+	private var host = properties.Host()
+	private var port = properties.Port()
 
-		host = properties.getProperty("test.host", "127.0.0.1")
-		port = properties.getProperty("test.port", "80").toInt()
+	private fun Client(): Client {
+		return Client(Host(host), Port(port), logger = PrintlnLogger())
 	}
 
-	private fun Client(vararg options: Option): Client {
-		return Client(*options, logger = PrintlnLogger())
+	private fun NoConnClient(): Client {
+		return Client(Host("10.0.0.0"), Port(0), logger = PrintlnLogger())
 	}
 
 	@Test
@@ -42,18 +32,18 @@ class ClientUnitTest {
 
 	@Test
 	fun new() {
-		Client(Host(host), Port(port))
+		Client()
 	}
 
 	@Test
 	fun close() {
-		val client = Client(Host(host), Port(port))
+		val client = Client()
 		client.Close()
 	}
 
 	@Test
 	fun sendErr(): Unit = runBlocking {
-		val client = Client(Host("192.168.0.1"), Port(10000))
+		val client = NoConnClient()
 		val headers = HashMap<String, String>()
 		headers["api"] = "/mega"
 		var ret = client.Send("{}".encodeToByteArray(), headers)
@@ -66,7 +56,7 @@ class ClientUnitTest {
 
 	@Test
 	fun asyncSendErr(): Unit = runBlocking {
-		val client = Client(Host("192.168.0.1"), Port(10000))
+		val client = NoConnClient()
 		val headers = HashMap<String, String>()
 		headers["api"] = "/mega"
 
@@ -83,13 +73,13 @@ class ClientUnitTest {
 
 	@Test
 	fun recoverErr(): Unit = runBlocking {
-		val client = Client(Host("192.168.0.1"), Port(10000))
+		val client = NoConnClient()
 		assertEquals(true, client.Recover()?.isConnError)
 	}
 
 	@Test
 	fun recover(): Unit = runBlocking {
-		val client = Client(Host(host), Port(port))
+		val client = Client()
 		assertNull(client.Recover())
 	}
 }
