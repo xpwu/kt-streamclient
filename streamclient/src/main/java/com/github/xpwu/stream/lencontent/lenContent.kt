@@ -12,6 +12,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -222,7 +223,7 @@ private fun LenContent.receiveInputStream() {
 		}
 
 		logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:start", "run async loop...")
-		while (!socket.isClosed && socket.isConnected) {
+		while (!socket.isClosed && socket.isConnected && isActive) {
 			var heartbeatTimeout = true
 			try {
 				val lengthB = ByteArray(4)

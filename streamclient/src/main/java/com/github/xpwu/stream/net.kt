@@ -381,9 +381,9 @@ internal class Net internal constructor(private val logger: Logger = AndroidLogg
 	override suspend fun onError(error: Error) {
 		val oldState = closeAndOldState(error)
 		if (oldState == State.Connected) {
-			logger.Debug("Net[$flag]<$connectID>.onError", error.toString())
 
 			scope.launch(Dispatchers.Default) {
+				logger.Debug("Net[$flag]<$connectID>.onError:onPeerClosed", error.message?:error.toString())
 				onPeerClosed(error)
 			}
 
