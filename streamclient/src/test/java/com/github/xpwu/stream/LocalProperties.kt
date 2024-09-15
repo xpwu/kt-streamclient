@@ -24,6 +24,6 @@ class LocalProperties {
 	}
 
 	fun Port(): Int {
-		return properties.getProperty("test.port", "80").toInt()
+		return properties.getProperty("test.port", "8080").toInt()
 	}
 }

@@ -4,6 +4,7 @@ import com.github.xpwu.stream.lencontent.Host
 import com.github.xpwu.stream.lencontent.Port
 import com.github.xpwu.x.PrintlnLogger
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -12,11 +13,8 @@ import org.junit.Test
 class ClientUnitTest {
 	private val properties = LocalProperties()
 
-	private var host = properties.Host()
-	private var port = properties.Port()
-
 	private fun Client(): Client {
-		return Client(Host(host), Port(port), logger = PrintlnLogger())
+		return Client(Host(properties.Host()), Port(properties.Port()), logger = PrintlnLogger())
 	}
 
 	private fun NoConnClient(): Client {
@@ -60,14 +58,10 @@ class ClientUnitTest {
 		val headers = HashMap<String, String>()
 		headers["api"] = "/mega"
 
-		val all = listOf(0, 1, 2, 3, 4)
-		val deferreds = all.map {
-			async {
-				client.Send("{}".encodeToByteArray(), headers)
+		repeat(10) {
+			launch {
+				assertEquals(true, client.Send("{}".encodeToByteArray(), headers).second?.isConnError)
 			}
-		}
-		deferreds.forEach{
-			assertEquals(true, it.await().second?.isConnError)
 		}
 	}
 
@@ -81,6 +75,16 @@ class ClientUnitTest {
 	fun recover(): Unit = runBlocking {
 		val client = Client()
 		assertNull(client.Recover())
+	}
+
+	@Test
+	fun asyncRecover(): Unit = runBlocking {
+		val client = Client()
+		repeat(10) {
+			launch {
+				assertNull(client.Recover())
+			}
+		}
 	}
 }
 
