@@ -1,8 +1,6 @@
 package com.github.xpwu.stream.fakehttp
 
 
-import java.nio.charset.StandardCharsets
-
 /**
  *
  *	fakehttp protocol:
@@ -55,8 +53,8 @@ internal fun Request(body: ByteArray, headers: Map<String, String>): Pair<Reques
 
 	val headerList = ArrayList<Pair<ByteArray, ByteArray>>()
 	for ((key1, value1) in headers) {
-		val key = key1.toByteArray(StandardCharsets.UTF_8)
-		val value = value1.toByteArray(StandardCharsets.UTF_8)
+		val key = key1.toByteArray()
+		val value = value1.toByteArray()
 
 		if (key.size > 255 || value.size > 255) {
 			val e = Error(

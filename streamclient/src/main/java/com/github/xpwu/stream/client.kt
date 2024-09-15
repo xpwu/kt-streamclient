@@ -57,7 +57,7 @@ suspend fun Client.Send(data: ByteArray, headers: Map<String, String>
 												, timeout: Duration = 30.seconds): Pair<ByteArray, StError?> {
 	val sflag = Integer.toHexString(Random.nextInt())
 
-	logger.Info("Client[$flag].Send[$sflag]:start", """$headers""")
+	logger.Info("Client[$flag].Send[$sflag]:start", """$headers, request size = ${data.size}""")
 
 	val net = net()
 	val err = net.connect()
@@ -69,7 +69,7 @@ suspend fun Client.Send(data: ByteArray, headers: Map<String, String>
 
 	val ret = net.send(data, headers, timeout)
 	if (ret.second == null) {
-		logger.Info("Client[$flag].Send[$sflag](connID=${net.connectID}):end", """data size = ${ret.first.size}""")
+		logger.Info("Client[$flag].Send[$sflag](connID=${net.connectID}):end", """response size = ${ret.first.size}""")
 		return ret
 	}
 	if (! ret.second!!.IsConnError) {
@@ -94,7 +94,7 @@ suspend fun Client.Send(data: ByteArray, headers: Map<String, String>
 			logger.Error("Client[$flag].Send[$sflag](connID=${net.connectID}):error"
 				, """request error: ${ret.second}""")
 		} else {
-			logger.Info("Client[$flag].Send[$sflag](connID=${net.connectID}):end", """data size = ${it.first.size}""")
+			logger.Info("Client[$flag].Send[$sflag](connID=${net.connectID}):end", """response size = ${it.first.size}""")
 		}
 		return@let it
 	}

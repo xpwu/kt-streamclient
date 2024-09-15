@@ -3,6 +3,7 @@ package com.github.xpwu.stream.lencontent
 import com.github.xpwu.stream.Protocol
 import com.github.xpwu.stream.TimeoutError
 import com.github.xpwu.x.AndroidLogger
+import com.github.xpwu.x.Host2Net
 import com.github.xpwu.x.Logger
 import com.github.xpwu.x.Net2Host
 import kotlinx.coroutines.CoroutineName
@@ -428,15 +429,21 @@ private fun LenContent.setOutputHeartbeat() {
 }
 
 internal suspend fun LenContent._send(content: ByteArray): Error? {
-	if (content.size > this.handshake.MaxBytes) {
-		return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes})""")
+	// sizeof(length) = 4
+	if (content.size > this.handshake.MaxBytes-4) {
+		return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes-4})""")
 	}
 
 	withContext(Dispatchers.IO) {
 		try {
-			logger.Debug("LenContent[$flag]<$connectID>._send:start", "data size = ${content.size}")
+			val len = ByteArray(4)
+			val length = content.size.toLong() + 4
+			Host2Net(length, len)
+
+			logger.Debug("LenContent[$flag]<$connectID>._send:start", "frameBytes = $length")
 			stopOutputHeartbeat()
 			outputMutex.lock()
+			outputStream.write(len)
 			outputStream.write(content)
 			logger.Debug("LenContent[$flag]<$connectID>._send:end", "end")
 		} catch (e: Exception) {
