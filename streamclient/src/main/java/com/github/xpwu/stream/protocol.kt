@@ -1,7 +1,9 @@
 package com.github.xpwu.stream
 
 import com.github.xpwu.x.Logger
+import com.github.xpwu.x.Net2Host
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 
 /**
@@ -45,6 +47,36 @@ interface Protocol {
 		override fun toString(): String {
 			return Info()
 		}
+
+		companion object {
+			/**
+			 * ```
+			 * HeartBeat_s | FrameTimeout_s | MaxConcurrent | MaxBytes | connect id
+			 * HeartBeat_s: 2 bytes, net order
+			 * FrameTimeout_s: 1 byte
+			 * MaxConcurrent: 1 byte
+			 * MaxBytes: 4 bytes, net order
+			 * connect id: 8 bytes, net order
+			 * ```
+			 */
+
+			const val StreamLen = 2 + 1 + 1 + 4 + 8
+
+			fun Parse(handshake: ByteArray): Handshake {
+				assert(handshake.size >= StreamLen)
+
+				val ret = Handshake()
+				ret.HearBeatTime = (((0xff and handshake[0].toInt()) shl 8) + (0xff and handshake[1].toInt())).seconds
+				ret.FrameTimeout = handshake[2].toInt().seconds // DurationJava(handshake[2] * DurationJava.Second)
+				ret.MaxConcurrent = handshake[3].toInt()
+				ret.MaxBytes = Net2Host(handshake, 4, 8)
+				val id1 = Net2Host(handshake, 8, 12)
+				val id2 = Net2Host(handshake, 12, 16)
+				ret.ConnectId = String.format("%08x", id1) + String.format("%08x", id2)
+
+				return ret
+			}
+		}
 	}
 
 	interface Delegate {
@@ -64,5 +96,15 @@ interface Protocol {
 internal fun Protocol.Handshake.Info(): String {
 	return "handshake info: {ConnectId: ${this.ConnectId}, MaxConcurrent: ${this.MaxConcurrent}" +
 		", HearBeatTime: ${this.HearBeatTime}, MaxBytes/frame: ${this.MaxBytes}, FrameTimeout: ${this.FrameTimeout}}"
+}
+
+class DummyDelegate(): Protocol.Delegate {
+	override suspend fun onMessage(message: ByteArray) {
+		TODO("onMessage")
+	}
+	override suspend fun onError(error: Error) {
+		TODO("onError")
+	}
+
 }
 

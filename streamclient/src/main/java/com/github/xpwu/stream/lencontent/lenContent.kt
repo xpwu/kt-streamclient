@@ -1,5 +1,6 @@
 package com.github.xpwu.stream.lencontent
 
+import com.github.xpwu.stream.DummyDelegate
 import com.github.xpwu.stream.Protocol
 import com.github.xpwu.stream.TimeoutError
 import com.github.xpwu.x.AndroidLogger
@@ -29,22 +30,6 @@ import java.util.Objects
 import kotlin.concurrent.Volatile
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
-
-private class DummyDelegate(private val logger: Logger): Protocol.Delegate {
-	override suspend fun onMessage(message: ByteArray) {
-		logger.Debug("LenContent.DummyDelegate.onMessage", """receive data(${message.size}Bytes)""")
-	}
-
-	/**
-	 * 连接成功后，任何不能继续通信的情况都以 onError 返回
-	 * connect() 的错误不触发 onError，
-	 * close() 的调用不触发 onError
-	 */
-	override suspend fun onError(error: Error) {
-		logger.Debug("LenContent.DummyDelegate.onError", error.toString())
-	}
-
-}
 
 private fun nullOutputStream(): OutputStream {
 	return object : OutputStream() {
@@ -109,7 +94,7 @@ class LenContent(vararg options: Option) : Protocol {
 
 	internal val optValue: OptionValue = OptionValue()
 	internal var logger: Logger = AndroidLogger()
-	internal var delegate: Protocol.Delegate = DummyDelegate(logger)
+	internal var delegate: Protocol.Delegate = DummyDelegate()
 
 	internal val heartbeatStop: Channel<Boolean> = Channel(UNLIMITED)
 
@@ -169,15 +154,7 @@ private fun handshakeReq(): ByteArray {
 
 private fun LenContent.readHandshake(inputStream: InputStream): Pair<Protocol.Handshake, Error?> {
 	var pos = 0
-
-	/*
-			HeartBeat_s: 2 bytes, net order
-			FrameTimeout_s: 1 byte
-			MaxConcurrent: 1 byte
-			MaxBytes: 4 bytes, net order
-			connect id: 8 bytes, net order
-			*/
-	val handshake = ByteArray(2 + 1 + 1 + 4 + 8)
+	val handshake = ByteArray(Protocol.Handshake.StreamLen)
 	while (handshake.size - pos != 0) {
 		val n = inputStream.read(handshake, pos, handshake.size - pos)
 		if (n <= 0) {
@@ -188,20 +165,11 @@ private fun LenContent.readHandshake(inputStream: InputStream): Pair<Protocol.Ha
 		pos += n
 	}
 
-	val ret = Protocol.Handshake()
-	ret.HearBeatTime = (((0xff and handshake[0].toInt()) shl 8) + (0xff and handshake[1].toInt())).seconds
-	ret.FrameTimeout = handshake[2].toInt().seconds // DurationJava(handshake[2] * DurationJava.Second)
-	ret.MaxConcurrent = handshake[3].toInt()
-	ret.MaxBytes = Net2Host(handshake, 4, 8)
-	val id1 = Net2Host(handshake, 8, 12)
-	val id2 = Net2Host(handshake, 12, 16)
-	ret.ConnectId = String.format("%08x", id1) + String.format("%08x", id2)
-
-	this.handshake = ret
+	this.handshake = Protocol.Handshake.Parse(handshake)
 
 	logger.Debug("LenContent[$flag]<$connectID>.readHandshake:handshake", this.handshake.toString())
 
-	return Pair(ret, null)
+	return Pair(this.handshake, null)
 }
 
 private fun LenContent.receiveInputStream() {
