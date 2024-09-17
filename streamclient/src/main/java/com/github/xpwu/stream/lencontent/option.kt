@@ -13,7 +13,13 @@ internal class OptionValue {
 	var tls: (host: String, port: Int, tcpSocket: Socket)->Pair<Socket, Error?>
 		// default: no tls
 		=  {_: String, _: Int, tcpSocket: Socket -> Pair(tcpSocket, null)}
+	internal var tlsBool = false
 	var connectTimeout: Duration = 30.seconds
+
+	override fun toString(): String {
+		val pre = if(tlsBool)"<tls>" else ""
+		return """$pre${host}:${port}#connectTimeout=${connectTimeout}"""
+	}
 }
 
 //typealias Option = (OptionValue)->Unit
@@ -57,12 +63,13 @@ fun TLS(): Option {
 
 			return@socket Pair(sslSocket, null)
 		}
+		value.tlsBool = true
 	}
 }
 
 fun TLS(strategy: (host: String, port: Int , tcpSocket: Socket)->Pair<Socket, Error?>): Option {
 	return Option{
-			value -> value.tls = strategy
+			value -> value.tls = strategy; value.tlsBool = true
 	}
 }
 

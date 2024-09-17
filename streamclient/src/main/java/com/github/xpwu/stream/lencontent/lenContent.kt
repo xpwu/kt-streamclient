@@ -285,7 +285,7 @@ private fun LenContent.receiveInputStream() {
 internal suspend fun LenContent._connect(): Pair<Protocol.Handshake, Error?> {
 	val r = withTimeoutOrNull(optValue.connectTimeout) {
 		withContext(Dispatchers.IO) {
-			logger.Debug("LenContent[$flag]._connect:start", "start")
+			logger.Debug("LenContent[$flag]._connect:start", optValue.toString())
 			try {
 				// connect 没有明确的 timeout 类型返回，所以让 connect 比 withTimeoutOrNull 多一秒
 				// withTimeoutOrNull 先于 connect 超时
