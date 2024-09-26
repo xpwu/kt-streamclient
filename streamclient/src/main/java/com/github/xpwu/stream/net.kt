@@ -54,7 +54,7 @@ private class SyncAllRequest(permits: Int = 3) {
 		reqMutex.lock()
 		try {
 			val ret = allRequests.remove(reqId)
-			if (ret != null && semaphore.availablePermits != 0) {
+			if (ret != null && semaphore.availablePermits < permits) {
 				semaphore.release()
 			}
 			return ret
