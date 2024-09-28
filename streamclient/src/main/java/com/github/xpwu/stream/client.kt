@@ -16,6 +16,8 @@ class Client(internal val logger: Logger = AndroidLogger(), internal var protoco
 	internal val flag = Integer.toHexString(Random.nextInt())
 	private var net = newNet()
 
+	companion object;
+
 	init {
 		logger.Info("Client[$flag].new", "flag=$flag")
 	}
