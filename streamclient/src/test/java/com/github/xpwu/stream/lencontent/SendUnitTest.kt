@@ -1,7 +1,9 @@
-package com.github.xpwu.stream
+package com.github.xpwu.stream.lencontent
 
-import com.github.xpwu.stream.lencontent.Host
-import com.github.xpwu.stream.lencontent.Port
+import com.github.xpwu.stream.Client
+import com.github.xpwu.stream.LocalProperties
+import com.github.xpwu.stream.SendWithReqId
+import com.github.xpwu.stream.withLenContent
 import com.github.xpwu.x.PrintlnLogger
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -56,7 +58,7 @@ class SendUnitTest {
 	private val properties = LocalProperties()
 
 	private fun Client(): Client {
-		return Client(Host(properties.Host()), Port(properties.Port()), logger = PrintlnLogger())
+		return Client.withLenContent(Host(properties.Host()), Port(properties.Port()), logger = PrintlnLogger())
 	}
 
 	@Test

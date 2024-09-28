@@ -1,9 +1,11 @@
-package com.github.xpwu.stream
+package com.github.xpwu.stream.lencontent
 
-import com.github.xpwu.stream.lencontent.Host
-import com.github.xpwu.stream.lencontent.Port
+import com.github.xpwu.stream.Client
+import com.github.xpwu.stream.LocalProperties
+import com.github.xpwu.stream.Recover
+import com.github.xpwu.stream.Send
+import com.github.xpwu.stream.withLenContent
 import com.github.xpwu.x.PrintlnLogger
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -14,11 +16,11 @@ class ClientUnitTest {
 	private val properties = LocalProperties()
 
 	private fun Client(): Client {
-		return Client(Host(properties.Host()), Port(properties.Port()), logger = PrintlnLogger())
+		return Client.withLenContent(Host(properties.Host()), Port(properties.Port()), logger = PrintlnLogger())
 	}
 
 	private fun NoConnClient(): Client {
-		return Client(Host("10.0.0.0"), Port(0), logger = PrintlnLogger())
+		return Client.withLenContent(Host("10.0.0.0"), Port(0), logger = PrintlnLogger())
 	}
 
 	@Test

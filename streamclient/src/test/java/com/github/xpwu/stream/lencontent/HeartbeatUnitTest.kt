@@ -1,7 +1,9 @@
-package com.github.xpwu.stream
+package com.github.xpwu.stream.lencontent
 
-import com.github.xpwu.stream.lencontent.Host
-import com.github.xpwu.stream.lencontent.Port
+import com.github.xpwu.stream.Client
+import com.github.xpwu.stream.LocalProperties
+import com.github.xpwu.stream.Recover
+import com.github.xpwu.stream.withLenContent
 import com.github.xpwu.x.Logger
 import com.github.xpwu.x.PrintlnLogger
 import kotlinx.coroutines.CoroutineScope
@@ -72,7 +74,7 @@ class HeartbeatUnitTest {
 	private val properties = LocalProperties()
 
 	private fun client(logger: Logger): Client {
-		return Client(Host(properties.Host()), Port(properties.Port()), logger = logger)
+		return Client.withLenContent(Host(properties.Host()), Port(properties.Port()), logger = logger)
 	}
 
 	@Test

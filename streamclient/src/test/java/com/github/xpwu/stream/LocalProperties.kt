@@ -26,4 +26,8 @@ class LocalProperties {
 	fun Port(): Int {
 		return properties.getProperty("test.port", "8080").toInt()
 	}
+
+	fun Url(): String {
+		return properties.getProperty("test.url", "127.0.0.1:8001")
+	}
 }
