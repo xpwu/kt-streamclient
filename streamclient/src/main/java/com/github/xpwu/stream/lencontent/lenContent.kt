@@ -402,27 +402,29 @@ internal suspend fun LenContent._send(content: ByteArray): Error? {
 		return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes-4})""")
 	}
 
-	withContext(Dispatchers.IO) {
+	return withContext(Dispatchers.IO) {
+		stopOutputHeartbeat()
+		outputMutex.lock()
 		try {
 			val len = ByteArray(4)
 			val length = content.size.toLong() + 4
 			Host2Net(length, len)
 
 			logger.Debug("LenContent[$flag]<$connectID>._send:start", "frameBytes = $length")
-			stopOutputHeartbeat()
-			outputMutex.lock()
+
 			outputStream.write(len)
 			outputStream.write(content)
 			logger.Debug("LenContent[$flag]<$connectID>._send:end", "end")
+
+			return@withContext null
 		} catch (e: Exception) {
 			logger.Debug("LenContent[$flag]<$connectID>._send:error", e.message?:"unknown")
 			this@_send.delegate.onError(Error(e.message?:e.toString()))
+			return@withContext  Error(e.message?:e.toString())
 		} finally {
 			outputMutex.unlock()
 			setOutputHeartbeat()
 		}
 	}
-
-	return null
 }
 

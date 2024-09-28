@@ -8,6 +8,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -36,7 +38,9 @@ private class SyncAllRequest(permits: Int = 3) {
 		}
 
 
-	suspend fun Add(reqId: Long): RequestChannel {
+	// channel 必须在 SyncAllRequest 的控制下，所以 Add 获取的只能 receive
+	// 要 send 就必须通过 remove 获取
+	suspend fun Add(reqId: Long): ReceiveChannel<Pair<FakeHttpResponse, StError?>> {
 		semaphore.acquire()
 		reqMutex.lock()
 		try {
@@ -50,7 +54,7 @@ private class SyncAllRequest(permits: Int = 3) {
 	}
 
 	// 可以用同一个 reqid 重复调用
-	suspend fun Remove(reqId: Long): RequestChannel? {
+	suspend fun Remove(reqId: Long): SendChannel<Pair<FakeHttpResponse, StError?>>? {
 		reqMutex.lock()
 		try {
 			val ret = allRequests.remove(reqId)
@@ -70,7 +74,6 @@ private class SyncAllRequest(permits: Int = 3) {
 			for ((_, ch) in allRequests) {
 				try {
 					ch.send(ret)
-					ch.close()
 				}catch (e: Exception) {
 					// nothing to do
 				}
@@ -223,7 +226,7 @@ internal class Net internal constructor(private val logger: Logger = AndroidLogg
 			val ret = withTimeoutOrNull(timeout) {
 				launch(Dispatchers.IO) {
 					this@Net.protocol.send(request.encodedData)?.let {
-						ch.send(Pair(FakeHttpResponse(), StError(it, false)))
+						allRequests.Remove(reqId)?.send(Pair(FakeHttpResponse(), StError(it, false)))
 					}
 				}
 				return@withTimeoutOrNull ch.receive()
