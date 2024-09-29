@@ -25,20 +25,10 @@ class HBLogger: Logger {
 
 	val hbTimeRegex = "^Net\\[.*]<.*>.connect:handshake$".toRegex()
 	val hbTimeResult = "^handshake info: \\{ConnectId: .*, MaxConcurrent: .*, HearBeatTime: (.*), MaxBytes/frame: .*, FrameTimeout: .*}$".toRegex()
-	val sendRegex = "^LenContent\\[.*]<.*>.outputHeartbeatTimer:send$".toRegex()
-	val recRegex = "^LenContent\\[.*]<.*>.receiveInputStream:Heartbeat$".toRegex()
 
 	private val print = PrintlnLogger(1)
 
 	override fun Debug(tag: String, msg: String) {
-//		if (sendRegex.matches(tag)) {
-//			send()
-//		}
-//		if (recRegex.matches(tag)) {
-//			scope.launch {
-//				recHbCh.send(true)
-//			}
-//		}
 		if (hbTimeRegex.matches(tag)) {
 			hbTimeResult.find(msg)?.let {
 				val (t)= it.destructured

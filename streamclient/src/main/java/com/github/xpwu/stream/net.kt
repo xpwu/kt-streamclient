@@ -74,6 +74,7 @@ private class SyncAllRequest(permits: Int = 3) {
 			for ((_, ch) in allRequests) {
 				try {
 					ch.send(ret)
+					ch.close()
 				}catch (e: Exception) {
 					// nothing to do
 				}
@@ -235,7 +236,7 @@ internal class Net internal constructor(private val logger: Logger = AndroidLogg
 			// ret == null: timeout
 			if (ret == null) {
 				logger.Debug("Net[$flag]<$connectID>.send[$reqId]:Timeout"
-					, """$headers (reqId:${reqId}) --- timeout(>${timeout.inWholeSeconds}$)""")
+					, """$headers (reqId:${reqId}) --- timeout(>${timeout.inWholeSeconds}s)""")
 				return Pair(ByteArray(0)
 					, TimeoutStError(Error("""request timeout(${timeout.inWholeSeconds}s)"""), false))
 			}

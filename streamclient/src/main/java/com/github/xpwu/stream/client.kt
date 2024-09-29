@@ -50,7 +50,7 @@ class Client(internal val logger: Logger = AndroidLogger(), internal var protoco
 	 */
 	@Synchronized
 	fun Close() {
-		logger.Info("Client[$flag].close", "close")
+		logger.Info("Client[$flag].close", "closed by self")
 		this.net.close()
 	}
 }

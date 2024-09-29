@@ -383,8 +383,8 @@ private fun LenContent.setOutputHeartbeat() {
 
 		// timeout
 		logger.Debug("LenContent[$flag]<$connectID>.outputHeartbeatTimer:send", "send heartbeat to server")
+		outputMutex.lock()
 		try {
-			outputMutex.lock()
 			outputStream.write(ByteArray(4){0})
 		}catch (e: Exception) {
 			this@setOutputHeartbeat.delegate.onError(Error(e.message?:e.toString()))
@@ -403,13 +403,13 @@ internal suspend fun LenContent._send(content: ByteArray): Error? {
 	}
 
 	return withContext(Dispatchers.IO) {
+		val len = ByteArray(4)
+		val length = content.size.toLong() + 4
+		Host2Net(length, len)
+
 		stopOutputHeartbeat()
 		outputMutex.lock()
 		try {
-			val len = ByteArray(4)
-			val length = content.size.toLong() + 4
-			Host2Net(length, len)
-
 			logger.Debug("LenContent[$flag]<$connectID>._send:start", "frameBytes = $length")
 
 			outputStream.write(len)
