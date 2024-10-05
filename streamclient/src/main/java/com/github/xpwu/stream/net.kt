@@ -327,7 +327,9 @@ internal class Net internal constructor(private val logger: Logger = AndroidLogg
 				onPeerClosed(error)
 			}
 
-			this.protocol.close()
+			scope.launch(Dispatchers.Default) {
+				protocol.close()
+			}
 		}
 	}
 
