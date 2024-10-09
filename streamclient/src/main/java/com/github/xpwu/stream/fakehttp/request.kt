@@ -37,6 +37,7 @@ package com.github.xpwu.stream.fakehttp
 internal class Request(private val data: ByteArray = ByteArray(0)) {
 
 	internal val encodedData: ByteArray get() = data
+	internal val loadLen: Int get() = data.size-4
 
 	fun setReqId(reqId: Long) {
 		data[0] = ((reqId and 0xff000000L) shr 24).toByte()

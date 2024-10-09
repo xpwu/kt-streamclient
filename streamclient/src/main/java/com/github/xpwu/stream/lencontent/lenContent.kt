@@ -3,6 +3,7 @@ package com.github.xpwu.stream.lencontent
 import com.github.xpwu.stream.DummyDelegate
 import com.github.xpwu.stream.Protocol
 import com.github.xpwu.stream.TimeoutError
+import com.github.xpwu.stream.fakehttp.Response
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Host2Net
 import com.github.xpwu.x.Logger
@@ -236,9 +237,8 @@ private fun LenContent.receiveInputStream() {
 				}
 
 				length -= 4
-				// todo: server must use this MaxBytes value also
 				// 出现这种情况，很可能是协议出现问题了，而不能单纯的认为是本次请求的问题
-				if (length > this@receiveInputStream.handshake.MaxBytes) {
+				if (length > this@receiveInputStream.handshake.MaxBytes + Response.MaxNoLoadLen) {
 					logger.Debug("LenContent[$flag]<$connectID>.receiveInputStream:MaxBytes"
 						, "error: data(len: $length > maxbytes: ${handshake.MaxBytes}) is Too Large")
 					this@receiveInputStream.delegate.onError(
@@ -397,11 +397,6 @@ private fun LenContent.setOutputHeartbeat() {
 }
 
 internal suspend fun LenContent._send(content: ByteArray): Error? {
-	// sizeof(length) = 4
-	if (content.size > this.handshake.MaxBytes-4) {
-		return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes-4})""")
-	}
-
 	return withContext(Dispatchers.IO) {
 		val len = ByteArray(4)
 		val length = content.size.toLong() + 4

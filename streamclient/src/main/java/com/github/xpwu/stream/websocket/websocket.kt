@@ -3,6 +3,7 @@ package com.github.xpwu.stream.websocket
 import com.github.xpwu.stream.Protocol
 import com.github.xpwu.stream.DummyDelegate
 import com.github.xpwu.stream.TimeoutError
+import com.github.xpwu.stream.fakehttp.Response
 import com.github.xpwu.x.AndroidLogger
 import com.github.xpwu.x.Logger
 import io.ktor.client.HttpClient
@@ -150,7 +151,7 @@ class WebSocket(vararg options: Option): Protocol {
 					length += frame.data.size
 					buffer.add(frame.readBytes())
 				}
-				if (length >= this@WebSocket.handshake.MaxBytes) {
+				if (length >= this@WebSocket.handshake.MaxBytes + Response.MaxNoLoadLen) {
 					// error
 					logger.Debug("WebSocket[$flag]<$connectID>.receiveMessage:MaxBytes"
 						, "error: data(len: $length > maxbytes: ${handshake.MaxBytes}) is Too Large")
@@ -199,10 +200,6 @@ class WebSocket(vararg options: Option): Protocol {
 	}
 
 	override suspend fun send(content: ByteArray): Error? {
-		if (content.size > handshake.MaxBytes) {
-			return Error("""request.size(${content.size}) > MaxBytes(${this.handshake.MaxBytes})""")
-		}
-
 		sendMutex.withLock {
 			try {
 				logger.Debug("WebSocket[$flag]<$connectID>.send:start", "size = ${content.size}")

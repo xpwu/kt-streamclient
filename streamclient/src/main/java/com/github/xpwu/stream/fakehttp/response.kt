@@ -46,6 +46,11 @@ internal class Response internal constructor(internal var reqID: Long = 0L
 		Failed
 	}
 
+	companion object {
+		// reqid + status + pushid
+		internal val MaxNoLoadLen = 4 + 1 + 4
+	}
+
 	internal val isPush: Boolean
 		get() = reqID == 1L
 

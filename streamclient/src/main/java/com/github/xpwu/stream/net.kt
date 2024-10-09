@@ -210,10 +210,10 @@ internal class Net internal constructor(private val logger: Logger = AndroidLogg
 			return Pair(ByteArray(0), StError(err, false))
 		}
 		request.setReqId(reqId)
-		if (request.encodedData.size > handshake.MaxBytes) {
-			logger.Debug("Net[$flag]<$connectID>.send:MaxBytes", """$headers (reqId:${reqId}) --- error: Too Large""")
+		if (request.loadLen > handshake.MaxBytes) {
+			logger.Debug("Net[$flag]<$connectID>.send:MaxBytes", """$headers (reqId:${reqId}) --- error:data is Too Large""")
 			return Pair(ByteArray(0)
-				, StError(Error("""request.size(${request.encodedData.size}) > MaxBytes(${handshake.MaxBytes})"""), false))
+				, StError(Error("""request.size(${request.loadLen}) > MaxBytes(${handshake.MaxBytes})"""), false))
 		}
 
 		// 在客户端超时也认为是一个请求结束，但是真正的请求并没有结束，所以在服务器看来，仍然占用服务器的一个并发数
