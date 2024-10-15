@@ -14,12 +14,13 @@ class Client(internal val logger: Logger = AndroidLogger(), internal var protoco
 	var onPeerClosed: suspend (reason: Error)->Unit = {}
 
 	internal val flag = Integer.toHexString(Random.nextInt())
-	private var net = newNet()
+	private var net: Net
 
 	companion object;
 
 	init {
 		logger.Info("Client[$flag].new", "flag=$flag")
+		net = newNet()
 	}
 
 	private fun newNet(): Net {
@@ -57,7 +58,7 @@ class Client(internal val logger: Logger = AndroidLogger(), internal var protoco
 
 suspend fun Client.Send(data: ByteArray, headers: Map<String, String>
 												, timeout: Duration = 30.seconds): Pair<ByteArray, StError?> {
-	val sflag = Integer.toHexString(Random.nextInt())
+	val sflag = headers[reqidKey] ?: Integer.toHexString(Random.nextInt())
 
 	logger.Info("Client[$flag].Send[$sflag]:start", """$headers, request size = ${data.size}""")
 

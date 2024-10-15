@@ -26,7 +26,7 @@ fun Client.UpdateOptions(vararg options: WebsocketOption) {
 	this.UpdateProtocol protocol@{ return@protocol WebSocket(*options) }
 }
 
-private const val reqidKey = "X-Req-Id"
+internal const val reqidKey = "X-Req-Id"
 
 suspend fun Client.SendWithReqId(data: ByteArray, headers: Map<String, String>
 												 , timeout: Duration = 30.seconds): Pair<ByteArray, StError?> {
